@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="generator" content="Admiral's Hands">
+<title></title>
+<style>
+*{
+	margin: 0px;
+	padding: 0px;
+	border: 0px;
+	outline: 0px;
+}
+html,body,#canvas{
+height: 100%;
+width: 100%;
+}
+body{
+	background-color: #000;
+}
+#canvas{
+	position: fixed;
+}
+</style>
+</head>
+<body><canvas id="canvas"></canvas><script>
+var canvas = document.getElementById('canvas');
+var c = canvas.getContext('2d');
+var w=0,h=0,cx=0,cy=0,wph=0;
+var pi = Math.PI;
+var tau = pi * 2;
+
+var mpos = [0,0];
+window.onmousemove = function(e){mpos=[(e.clientX - cx)*10, (e.clientY - cy)*10];}
+
+var keyList = [];
+keyList[32] = 'space';
+keyList[38] = 'up';
+keyList[40] = 'down';
+keyList[37] = 'left';
+keyList[39] = 'right';
+keyList[49] = 'one';
+keyList[50] = 'two';
+keyList[51] = 'three';
+keyList[52] = 'four';
+var kb = {};
+function setKey(e){
+	if(e.type == 'keyup'){val = false;}
+	else{val = true;}
+	if(keyList[e.keyCode]){
+		kb[keyList[e.keyCode]] = val;
+	}
+}
+window.onkeydown = setKey;
+window.onkeyup = setKey;
+
+
+var depthMultiply = function(point,offset){
+	//    ???
+	var zMul = 500;
+	//       (  (            position         ) + (                depth                 ) ) * (            scale           )
+	var px = ( (mpos[0] + offset[0] + point[0]) + ((point[2] + offset[2]) * (mpos[0]/zMul)) ) * ((point[2] + offset[2] + zMul) / zMul);
+	var py = ( (mpos[1] + offset[1] + point[1]) + ((point[2] + offset[2]) * (mpos[1]/zMul)) ) * ((point[2] + offset[2] + zMul) / zMul);
+	return {x:px,y:py};
+}
+var dM = depthMultiply;
+
+var drawLines = function(o){
+	for(var i = 0; i < o.lines.length; i += 1){
+		//depths of point 0 and 1 in the line
+		var d0 = o.points[o.lines[i][0]][2] + o.pos[2];
+		var d1 = o.points[o.lines[i][1]][2] + o.pos[2];
+		if( d0 > -3000 && d1 > -3000){
+			var p0 = dM(o.points[o.lines[i][0]],o.pos);
+			var p1 = dM(o.points[o.lines[i][1]],o.pos);
+			c.beginPath();
+			c.moveTo(p0.x,p0.y);
+			c.lineTo(p1.x,p1.y);
+			
+			c.strokeStyle= o.lines[i][2] || '#f00';
+			c.lineWidth=2;
+			c.lineCap='round';
+			c.stroke();
+		}
+	}
+}
+
+var resize = function(){
+	cx=Math.floor(w/2);
+	cy=Math.floor(h/2);
+	mpos.x = 0;
+	mpos.y = 0;
+	canvas.width=w;
+	canvas.height=h;
+	wph=w+h;
+}
+
+c.strokeWidth=2;
+var update = function(){
+	w=window.innerWidth;
+	h=window.innerHeight;
+	if(wph != w+h){resize();}
+	c.strokeStyle='#f00';
+	//c.fillStyle='rgba(0,0,0,.4)';
+	c.fillStyle='rgba(0,0,0,1)';
+	c.fillRect(0,0,w,h);
+	c.save();
+	c.translate(cx,cy);
+
+	//depth sorting!
+	rQ.sort(function(a,b) {return a.pos[2] - b.pos[2]})
+
+	for(var i = 0; i < rQ.length; i += 1){
+		rQ[i].update();
+	}
+
+	addBullet();
+
+	c.restore();
+	setTimeout(update,1000/40);
+}
+
+var Shape = function(pos){
+	if(this === window){throw 'JIM TYPE ERROR'};
+	this.pos = pos || [0,0,0];
+	return this;
+}
+
+Shape.prototype = {
+	points:[
+		[ 10, 10, 10],
+		[ 10, 10,-10],
+		[ 10,-10, 10],
+		[ 10,-10,-10],
+		[-10, 10, 10],
+		[-10, 10,-10],
+		[-10,-10, 10],
+		[-10,-10,-10]
+	],
+	lines:[
+		[0,1],
+		[2,3],
+		[4,5],
+		[6,7],
+		[3,1],
+		[2,0],
+		[7,5],
+		[6,4],
+		[5,1],
+		[7,3],
+		[4,0],
+		[6,2,'#fff']
+	],
+	pos:[0,0,0],
+	update:function(){
+		drawLines(this);
+	},
+	destroy:function(){
+		for(var i = 0; i < rQ.length; i += 1){
+			if(rQ[i] === this){
+				rQ.splice(i,1);
+			}
+		}
+	}
+};
+
+var rint = function(num){
+	return Math.round(((Math.random()*2)-1)*num);
+}
+var addBullet = function(){
+	var mover = new Shape([rint(1000),rint(1000),500]);
+	mover.update = function(){
+		drawLines(this);
+		this.pos[2] -= 10;
+		if(this.pos[2] < -1000){
+			this.destroy();
+		}
+	}
+	rQ.push(mover);
+};
+
+
+var ship = new Shape([0,0,0]);
+ship.points = [
+	[20,0,0],
+	[0,20,0],
+	[-20,0,0],
+	[0,-20,0],
+
+	[40,0,0],
+
+	[10,0,10],
+	[0,10,10],
+	[-10,0,10],
+	[0,-10,10]
+
+];
+ship.lines = [
+	[5,0,'#06c'],
+	[6,1,'#06c'],
+	[7,2,'#06c'],
+	[8,3,'#06c'],
+	[0,1,'#03a'],
+	[1,2,'#03a'],
+	[2,3,'#03a'],
+	[3,0,'#03a'],
+	[0,4,'#03a'],
+	[5,6,'#09f'],
+	[6,7,'#09f'],
+	[7,8,'#09f'],
+	[8,5,'#09f'],
+];
+ship.speed = 3;
+ship.vel = [0,0];
+ship.drag = 0.9;
+ship.rot = 0;
+ship.update = function(){
+	var t = this;
+
+	if(kb.left){t.vel[0]-=this.speed;}
+	if(kb.right){t.vel[0]+=this.speed;}
+	if(kb.up){t.vel[1]-=this.speed;}
+	if(kb.down){t.vel[1]+=this.speed;}
+
+	if(Math.abs(t.vel[0]) > 0.0001 || Math.abs(t.vel[1]) > 0.0001){
+		t.pos[0] += t.vel[0];
+		t.pos[1] += t.vel[1];
+		t.vel[0] *= t.drag;
+		t.vel[1] *= t.drag;
+		t.rot = Math.atan2(t.vel[0],t.vel[1]);
+		if(t.pos[0] > cx + 16){t.pos[0] = -cx -16;}
+		if(t.pos[0] < -cx -16){t.pos[0] = cx + 16;}
+		if(t.pos[1] > cy + 16){t.pos[1] = -cy -16;}
+		if(t.pos[1] < -cy -16){t.pos[1] = cy + 16;}
+	}
+	drawLines(t);
+};
+
+
+var rQ = [];
+rQ.push(new Shape());
+rQ.push(ship);
+
+
+
+for(var i = 0; i < 100; i += 1){
+	rQ.push(new Shape([rint(1000),rint(1000),rint(250)]));
+}
+
+
+canvas.onclick = addBullet;
+
+update();
+</script></body>
+</html>

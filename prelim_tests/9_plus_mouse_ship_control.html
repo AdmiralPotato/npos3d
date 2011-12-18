@@ -1,0 +1,1001 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="generator" content="Admiral's Hands">
+<title></title>
+<style>
+*{
+	margin: 0px;
+	padding: 0px;
+	border: 0px;
+	outline: 0px;
+}
+html,body,#canvas{
+height: 100%;
+width: 100%;
+}
+body{
+	background-color: #000;
+}
+#canvas{
+	position: fixed;
+	cursor: none;
+}
+#controls{
+	position: absolute;
+	top: 0px;
+	left: 0px;
+	padding: 16px;
+	background-color: rgba(255,255,255,0.1);
+	color: #9f0;
+	font-size: 12px;
+	line-height: 16px;
+	font-family: monospace;
+	white-space: pre-wrap;
+}
+</style>
+</head>
+<body><canvas id="canvas"></canvas>
+<div id="controls">The following controls do things:
+Arrows / WSAD: move your ship
+Space: Fire a bullet
+1: Plant a tree
+2: Plant a different tree
+3: Plant a car
+4: Change ship type
+-
+Moving the shop controlls the camera X and Y
+Scrolling controlls camera Z
+<div id="displayStatus">!</div>
+</div>
+<script src="Stats.js"></script><script>
+//--------------------------------
+//Basic scene setup
+//--------------------------------
+
+var canvas = document.getElementById('canvas');
+var c = canvas.getContext('2d');
+var w=0,h=0,cx=0,cy=0,wph=0;
+var pi = Math.PI;
+var tau = pi * 2;
+
+//Field Of View; Important!
+var fov = 550;
+var clipNear = fov; //This line is also VERY important! Never have the clipNear less than the FOV!
+var clipFar = -1000;
+
+//Kind of a hack, but it works in a pinch.
+var camera = [0,0,0];
+
+//which is short for renderQueue - push ob3Ds into this to get them to show up in the scene
+//invoke [ob].destroy(); to remove an ob3D from the scene.
+var rQ = [];
+
+//--------------------------------
+//Basic input setup
+//--------------------------------
+
+var mpos = [0,0];
+window.onmousemove = function(e){mpos=[e.clientX - cx, e.clientY - cy];}
+
+var scroll=0;
+window.onmousewheel = function(e){scroll=e.wheelDelta;}; //Chrome
+window.addEventListener('DOMMouseScroll',function(e){scroll=e.detail;},false); //FireFox. Wut. You. Smokin.
+
+var keyList = [];
+keyList[32] = 'space';
+keyList[38] = 'up';
+keyList[40] = 'down';
+keyList[37] = 'left';
+keyList[39] = 'right';
+keyList[49] = 'one';
+keyList[50] = 'two';
+keyList[51] = 'three';
+keyList[52] = 'four';
+//Hot crap! I never thought of this before, but this control method allows double function mapping! YES!
+keyList[87] = 'up'; //w
+keyList[83] = 'down'; //s
+keyList[65] = 'left'; //a
+keyList[68] = 'right'; //d
+var kb = {};
+function setKey(e){
+	//console.log(e.keyCode);
+	if(e.type == 'keyup'){val = false;}
+	else{val = true;}
+	if(keyList[e.keyCode]){
+		kb[keyList[e.keyCode]] = val;
+	}
+}
+window.onkeydown = setKey;
+window.onkeyup = setKey;
+
+
+//--------------------------------
+//This is where all of the 3D and math happens
+//--------------------------------
+
+
+var project3Dto2D = function(p3){
+	//return {x:p3[0],y:p3[1]};
+	var scale = fov/(fov + -p3[2]), p2 = {};
+	p2.x = (p3[0] * scale);
+	p2.y = (p3[1] * scale);
+	p2.scale = scale;
+	return p2;
+};
+
+
+
+
+var rotatePoint = function(x,y,rad){
+	var length = Math.sqrt((x * x) + (y * y));
+	var currentRad = Math.atan2(x,y);
+	x = Math.sin(currentRad - rad) * length;
+	y = Math.cos(currentRad - rad) * length;
+	var output = [x,y];
+	return output;
+}
+var totalRotationCalculations = 0;
+var getP3Rotated = function(p3,rot,order){
+	//return p3;
+	var x = p3[0], y = p3[1], z = p3[2];
+	var xr = rot[0], yr = rot[1], zr = rot[2];
+	//Alright, here's something interesting.
+	//The order you rotate the dimentions is IMPORTANT to rotation animation!
+	//Here's my quick, no math approach to applying that.
+	for(var r = 0; r < order.length; r += 1){
+		if(order[r] === 0){
+			//x...
+			if(xr !== 0){
+				var zy = rotatePoint(z,y,xr);
+				z = zy[0];
+				y = zy[1];
+				totalRotationCalculations += 1;
+			}
+		}else if(order[r] === 1){
+			//y...
+			if(yr !== 0){
+				var xz = rotatePoint(x,z,yr);
+				x = xz[0];
+				z = xz[1];
+				totalRotationCalculations += 1;
+			}
+		}else if(order[r] === 2){
+			//z...
+			if(zr !== 0){
+				var xy = rotatePoint(x,y,zr);
+				x = xy[0];
+				y = xy[1];
+				totalRotationCalculations += 1;
+			}
+		}else{
+			throw 'up';
+		}
+	}
+	return [x,y,z];
+}
+var getP3Scaled = function(p3,scale){
+	//return p3;
+	return [p3[0]*scale[0], p3[1]*scale[1], p3[2]*scale[2]];;
+}
+
+//I used to use a function in here named nGetOffsets that would do the same thing, looping through dimentions.
+//It was TERRIBLY inefficient at this task, so I replaced it in favor of nDimention specific versions.
+var getP3Offset = function(p3,offset){
+	//an efficient hack to quickly add an offset to a 3D point
+	return [p3[0]+offset[0], p3[1]+offset[1], p3[2]+offset[2]];
+}
+var getP2Offset = function(p2,offset){
+	//an efficient hack to quickly add an offset to a 2D point
+	return [p2[0]+offset[0], p2[1]+offset[1]];
+}
+
+
+var getP3String = function(p3){
+	return 'x:'+p3[0]+' y:'+p3[1]+' z:'+p3[2];
+}
+
+var nGetBounds = function(pointList){
+	//Works for 2D, 3D, and nD!
+	var min = [];
+	var max = [];
+	var p = pointList[0];
+	for(var d = 0; d < p.length; d += 1){
+		min[d] = p[d]; max[d] = p[d];
+	}
+	for(var i = 1; i < pointList.length; i += 1){
+		var p = pointList[i];
+		//d stands for dimention
+		for(var d = 0; d < p.length; d += 1){
+			if(p[d] < min[d]){min[d] = p[d];}
+			else if(p[d] > max[d]){max[d] = p[d];}
+		}
+	}
+	return [min,max];
+}
+
+var lineRenderLoop = function(o){
+	var computedPointList = [];
+	for(var i = 0; i < o.shape.points.length; i += 1){
+		//to make sure I'm not messing with the original array...
+		var point = [o.transformedPointCache[i][0],o.transformedPointCache[i][1],o.transformedPointCache[i][2]];
+		point = getP3Offset(point, o.pos);
+		point = getP3Offset(point, camera);
+		computedPointList[i] = point;
+	}
+	for(var i = 0; i < o.shape.lines.length; i += 1){
+		//offset the points by the object's position
+		var p3a = computedPointList[o.shape.lines[i][0]];
+		var p3b = computedPointList[o.shape.lines[i][1]];
+		//if the depths of the first and second point in the line are not behind the camera...
+		//and the depths of the first and second point in the line are closer than the far plane...
+		if(p3a[2] < clipNear && p3b[2] < clipNear && p3a[2] > clipFar && p3b[2] > clipFar){
+			var p0 = project3Dto2D(p3a);
+			var p1 = project3Dto2D(p3b);
+			//                   min        max
+			var screenBounds = [[-cx, -cy],[cx, cy]];
+			var p0InBounds = pointInBounds([p0.x,p0.y],screenBounds);
+			var p1InBounds = pointInBounds([p1.x,p1.y],screenBounds);
+			//If the line is completely off screen, do not bother rendering it.
+			if(p0InBounds || p1InBounds){
+				c.beginPath();
+				c.moveTo(p0.x,p0.y);
+				c.lineTo(p1.x,p1.y);
+				
+				c.strokeStyle= o.shape.lines[i][2] || o.shape.color || '#fff';
+				c.lineWidth=1;
+				c.lineCap='round';
+				c.stroke();
+			}
+		}
+	}
+}
+
+var drawLines = function(o){
+	//I see no reason to check whether the rotation/scale is different between processing each point,
+	//so I'll just do that once per frame and have a loop just for rotating the points.
+	if(o.lastRotString !== getP3String(o.rot) || o.lastScaleString !== getP3String(o.scale)){
+		for(var i = 0; i < o.shape.points.length; i += 1){
+			//to make sure I'm not messing with the original array...
+			var point = [o.shape.points[i][0],o.shape.points[i][1],o.shape.points[i][2]];
+			point = getP3Scaled(point, o.scale);
+			point = getP3Rotated(point, o.rot, o.rotOrder);
+			o.transformedPointCache[i] = point;
+		}
+		o.boundingBox = nGetBounds(o.transformedPointCache);
+		o.lastScaleString = getP3String(o.scale);
+		o.lastRotString = getP3String(o.rot);
+	}
+
+	var bbMinOffset = getP3Offset(getP3Offset(o.boundingBox[0], o.pos), camera);
+	var bbMaxOffset = getP3Offset(getP3Offset(o.boundingBox[1], o.pos), camera);
+
+	if(o.renderAlways){
+		lineRenderLoop(o);
+		return;
+	}
+
+	//Checking to see if any part of the bounding box is in front on the camera and closer than the far plane before bothering to do anything else...
+	if(bbMaxOffset[2] > clipFar && bbMinOffset[2] < clipNear && bbMaxOffset[2] > clipFar && bbMaxOffset[2] < clipNear){
+		//Alright. It's in front and not behind. Now is the bounding box even partially on screen?
+		//8 points determine the cube... let's start from the top left, spiraling down clockwise
+		var bbCube = [
+			[bbMinOffset[0],bbMinOffset[1],bbMaxOffset[2]],
+			[bbMaxOffset[0],bbMinOffset[1],bbMaxOffset[2]],
+			[bbMaxOffset[0],bbMaxOffset[1],bbMaxOffset[2]],
+			[bbMinOffset[0],bbMaxOffset[1],bbMaxOffset[2]],
+			[bbMinOffset[0],bbMinOffset[1],bbMinOffset[2]],
+			[bbMaxOffset[0],bbMinOffset[1],bbMinOffset[2]],
+			[bbMaxOffset[0],bbMaxOffset[1],bbMinOffset[2]],
+			[bbMinOffset[0],bbMaxOffset[1],bbMinOffset[2]],
+		];
+		var bbOffscreen = true;
+		//At some point in the future if I wanted to get really crazy, I could probably determine which order
+		//to sort the array above to orient the point closest to the center of the screen nearest the first of the list,
+		//so I don't bother checking all 8 points to determine if it's on screen - or even off screen.
+		for(var i = 0; i < bbCube.length && bbOffscreen; i += 1){
+			bbp = project3Dto2D(bbCube[i]);
+			if(bbp.x < cx && bbp.x > -cx && bbp.y < cy && bbp.y > -cy){
+				bbOffscreen = false;
+			}
+		}
+		if(!bbOffscreen){
+			lineRenderLoop(o);
+		}
+	}
+}
+
+//The only reason this isn't with the rest of the shapes is because I need to use it inside the prototype of ob3D
+var cubeShape = {
+	color:'#999',
+	points:[
+		[ 10, 10, 10],
+		[ 10, 10,-10],
+		[ 10,-10, 10],
+		[ 10,-10,-10],
+		[-10, 10, 10],
+		[-10, 10,-10],
+		[-10,-10, 10],
+		[-10,-10,-10]
+	],
+	lines:[
+		[0,1],
+		[2,3],
+		[4,5],
+		[6,7],
+		[3,1],
+		[2,0],
+		[7,5],
+		[6,4],
+		[5,1],
+		[7,3],
+		[4,0],
+		[6,2]
+	],
+};
+
+var blessWith3DBase = function(o,args){
+	o.pos = args[0] || [0,0,0];
+	o.rot = [0,0,0];
+	o.rotOrder = [0,1,2];
+	o.scale = [1,1,1];
+	o.lastScaleString = getP3String(o.scale);
+	o.lastRotString = false;
+	o.transformedPointCache = [];
+	o.boundingBox = [[0,0,0],[0,0,0]];
+	if(args[1]){o.shape = args[1];}
+}
+
+var ob3D = function(pos,shape){
+	if(this === window){throw 'JIM TYPE ERROR'};
+	var t = this;
+	blessWith3DBase(t,arguments);
+	return this;
+}
+
+ob3D.prototype = {
+	renderAlways: false,
+	shape: cubeShape,
+	pos:[0,0,0],
+	update:function(){
+		drawLines(this);
+	},
+	destroy:function(){
+		for(var i = 0; i < rQ.length; i += 1){
+			if(rQ[i] === this){
+				rQ.splice(i,1);
+			}
+		}
+	}
+};
+
+var act3D = function(pos,shape){
+	if(this === window){throw 'JIM TYPE ERROR'};
+	var t = this;
+	blessWith3DBase(t,arguments);
+	t.emitter = false;
+	t.isActor = true;
+	t.health = 10;
+	t.damage = 10;
+	return t;
+}
+
+act3D.prototype = Object.create(ob3D.prototype);
+
+var dealDamage = function(t){
+	var shiftedBoundingBox = [getP3Offset(t.boundingBox[0],t.pos),getP3Offset(t.boundingBox[1],t.pos)];
+	for(var i = 0; i < rQ.length; i += 1){
+		//lol, this was laughably bad -
+		//at first, I forgot to check if the located actor was itself or not,
+		//and the first time update was run, the ship was colliding with itself!
+		//a is for actor
+		var a = rQ[i];
+
+
+		var sharesParent = a.emitter && t.emitter && t.emitter !== a.emitter;
+		if(a.isActor === true && a !== t && a !== t.emitter && t !== a.emitter && !sharesParent){
+			if(pointInBounds(a.pos,shiftedBoundingBox)){
+				console.log('COLLISSION!',a.name,'hit',t.name,a,t);
+				a.health -= t.damage;
+				t.health -= a.damage;
+				if(t.health <= 0){t.destroy();}
+				if(a.health <= 0){a.destroy();}
+			}
+		}
+	}
+}
+
+act3D.prototype.update = function(){
+	var t = this;
+	//Took me a while to figure out the flickering on destroy -
+	//Turns out you need to calculate the BB before you can hit test it.
+	drawLines(t);
+	dealDamage(t);
+};
+
+var rint = function(num){
+	return Math.round(((Math.random()*2)-1)*num);
+}
+
+//--------------------------------
+//Where da sprites at!
+//--------------------------------
+
+
+var drawSprite = function(o){
+	//offset the points by the object's position
+	var p3 = o.pos;
+	//TOTALLY A HACK TO GET SOME CAMERA MOVEMENT
+	var p3 = getP3Offset(p3, [camera[0],camera[1],camera[2]]);
+	if( p3[2] < clipNear && p3[2] > clipFar ){
+		var p2 = project3Dto2D(p3);
+		//Just some basic positional culling... if it's not on screen, don't render it...
+		if((p2.x + (o.offset.x * p2.scale) < cx && p2.x - (o.offset.x * p2.scale) > -cx) && (p2.y + (o.offset.y * p2.scale) < cy && p2.y - (o.offset.y * p2.scale) > -cy)){
+			c.save();
+			c.translate(p2.x,p2.y);
+			c.scale(p2.scale,p2.scale);
+			c.rotate(o.rot);
+			c.drawImage(o.image,o.offset.x,o.offset.y );
+			c.restore();
+		}
+	}
+}
+
+var sprite2D3D = function(pos,path){
+	if(this === window){throw 'JIM TYPE ERROR'};
+	var t = this;
+	this.pos = pos || [0,0,0];
+	this.image = new Image();
+	this.image.onload = function(){
+		t.offset = {
+			x:-Math.round(t.image.width/2),
+			y:-Math.round(t.image.height/2)
+		};
+		rQ.push(t);
+		//console.log(t);
+	};
+	this.image.src = path;
+	return this;
+}
+
+sprite2D3D.prototype = {
+	pos:[0,0,0],
+	rot:0,
+	update:function(){
+		this.rot += tau/360;
+		drawSprite(this);
+	},
+	destroy:function(){
+		for(var i = 0; i < rQ.length; i += 1){
+			if(rQ[i] === this){
+				rQ.splice(i,1);
+			}
+		}
+	}
+};
+
+
+//--------------------------------
+//Some basic animation tools
+//--------------------------------
+
+
+//THIS IS A REALLY, REALLY SLOW FUNCTION! PROBABLY BECAUSE OF ALL OF THE LOOPING AND CHECKING!
+var nGetOffsets = function(set0,set1,sub){
+	//console.log(arguments);
+	//The sub variable allows the function to work additively or subtractively.
+	if(sub === undefined || sub === false){sub = false;}else{sub = true;}
+	if(set0.length !== set1.length){throw 'Non-matching set lengths!';}
+	var typeError = 'All set values MUST be numbers! Problem encountered at: ';
+	var offsets = [];
+	for(var i = 0; i < set0.length; i += 1){
+		if(typeof set0[i] !== 'number'){throw typeError + 'set0 key '+i;}
+		if(typeof set1[i] !== 'number'){throw typeError + 'set1 key '+i;}
+		if(!sub){
+			offsets[i] = set1[i] + set0[i];
+		}else{
+			offsets[i] = set1[i] - set0[i];
+		}
+	}
+	return offsets;
+}
+
+//THIS IS -PROBABLY- A SLOW FUNCTION BECAUSE OF THE LOOPING, AND THE USE OF nGetOffsets
+var nTerpolate = function(set0, set1,totalSteps,state){
+	var offsets = nGetOffsets(set0,set1,true);
+	var result = [];
+	for(var i = 0; i < set0.length; i += 1){
+		result[i] = set0[i] + ((offsets[i] / totalSteps) * state);
+	}
+	return result;
+}
+
+
+//--------------------------------
+//Some basic boundary / collission testing maths. Still not entirely sure how the get2DInterset math works.
+//--------------------------------
+
+//I'm sure this function causes lag. I'm going to make 2D and 3D speciffic versions in a minute here.
+var pointInBounds = function (point,bounds){
+	//Works for 2D, 3D, and nD! Please, please feed in bounds generated like the line below.
+	//var bounds = nGetBounds(pointList);
+	//d stands for dimention
+	for(var d = 0; d < point.length; d += 1){
+		//dimentional value check
+		if(point[d] < bounds[0][d] || point[d] > bounds[1][d]){
+			return false;
+		}
+	}
+	return true;
+}
+
+// The following implementation HEAVILY influenced by the example2.c located at:
+// http://paulbourke.net/geometry/lineline2d/
+// Thanks for the help, Paul Bourke and Karl Kurbjun!
+// Please refer to the above URL for help understanding this.
+
+var get2DIntersect = function(firstLine,secondLine,pointList){
+
+	var line1 = {
+		p1:{
+			x:pointList[firstLine[0]][0],
+			y:pointList[firstLine[0]][1]
+		},
+		p2:{
+			x:pointList[firstLine[1]][0],
+			y:pointList[firstLine[1]][1]
+		},
+	};
+
+	var line2 = {
+		p1:{
+			x:pointList[secondLine[0]][0],
+			y:pointList[secondLine[0]][1]
+		},
+		p2:{
+			x:pointList[secondLine[1]][0],
+			y:pointList[secondLine[1]][1]
+		},
+	};
+
+	//The above is about the only bit I've written,
+	//and it only serves to get my data into the format used below.
+	//The rest I must attribute to Paul & Karl.
+
+	/* Denominator for ua and ub are the same so store this calculation */
+	var d = (line2.p2.y - line2.p1.y)*(line1.p2.x-line1.p1.x) -
+					(line2.p2.x - line2.p1.x)*(line1.p2.y-line1.p1.y);
+
+	/* n_a and n_b are calculated as seperate values for readability */
+	var n_a = (line2.p2.x - line2.p1.x)*(line1.p1.y-line2.p1.y) - 
+						(line2.p2.y - line2.p1.y)*(line1.p1.x-line2.p1.x);
+	var n_b = (line1.p2.x - line1.p1.x)*(line1.p1.y - line2.p1.y) -
+						(line1.p2.y - line1.p1.y)*(line1.p1.x - line2.p1.x);
+
+	/* Make sure there is not a division by zero - this also indicates that
+	 * the lines are parallel.
+	 *
+	 * If n_a and n_b were both equal to zero the lines would be on top of each 
+	 * other (coincidental).  This check is not done because it is not 
+	 * necessary for this implementation (the parallel check accounts for this).
+	 */
+	if(d === 0){return false;}
+
+	/* Calculate the intermediate fractional point that the lines potentially
+	 *  intersect.
+	 */
+	var ua = n_a / d;
+	var ub = n_b / d;
+
+	/* The fractional point will be between 0 and 1 inclusive if the lines
+	 * intersect.  If the fractional calculation is larger than 1 or smaller
+	 * than 0 the lines would need to be longer to intersect.
+	 */
+	display.innerHTML = 'd: '+d+'<br>ua: '+ua+'<br>ub: '+ub+'<br>';
+	if(ua >=0 && ua <= 1 && ub >= 0 && ub <= 1){
+		var x = line1.p1.x + (ua * (line1.p2.x - line1.p1.x));
+		var y = line1.p1.y + (ua * (line1.p2.y - line1.p1.y));
+		var result = [x,y];
+		drawCircle(result);
+		return result;
+	}
+	return false;
+}
+
+
+//--------------------------------
+//Some Meshes to play with!
+//--------------------------------
+//I wrote this one by hand...
+var shipShape = {
+	points:[
+		[20,0,0],
+		[0,20,0],
+		[-20,0,0],
+		[0,-20,0],
+		[40,0,0],
+		[10,0,10],
+		[0,10,10],
+		[-10,0,10],
+		[0,-10,10],
+		[0,40,0],
+		[-40,0,0],
+		[0,-40,0],
+		[0,0,-40]
+	],
+	lines:[
+		[12,4,'#f3c'],
+		[12,9,'#f3c'],
+		[12,10,'#f3c'],
+		[12,11,'#f3c'],
+		[9,4,'#93c'],
+		[10,9,'#93c'],
+		[11,10,'#93c'],
+		[4,11,'#93c'],
+
+		[5,0,'#06f'],
+		[6,1,'#06f'],
+		[7,2,'#06f'],
+		[8,3,'#06f'],
+		[0,1,'#03c'],
+		[1,2,'#03c'],
+		[2,3,'#03c'],
+		[3,0,'#03c'],
+		[5,6,'#09f'],
+		[6,7,'#09f'],
+		[7,8,'#09f'],
+		[8,5,'#09f'],
+		[0,4,'#f3c'],
+		[1,9,'#f3c'],
+		[2,10,'#f3c'],
+		[3,11,'#f3c']
+	]
+};
+var centerPointShape = {
+	color:'#0f0',
+	points:[
+		[10,-10,0],
+		[-10,10,0],
+		[10,10,0],
+		[-10,-10,0]
+	],
+	lines:[
+		[0,1],
+		[2,3]
+	]
+};
+//and I wrote another JS document to convert an OBJ file exported from Blender to generate this one.
+var shapes = {
+	evilpumpkinBody:{"color":"#f90","points":[[48.30008,-12.548729999999999,51.73503],[55.77212,0,30],[48.300070000000005,12.548729999999999,8.26496],[12.5,-38.23557,52.92468],[24.15004,-48.77378,30.82049],[27.88606,-41.82909000000001,5.849959999999999],[24.15004,-23.67633,-12.64958],[12.5,0.73557,-14.575320000000001],[-12.5,-38.23557,52.92468],[-24.15004,-48.77378,30.82049],[-27.88606,-41.82909000000001,5.849959999999999],[-24.15004,-23.67632,-12.64958],[-12.5,0.73558,-14.575320000000001],[-25,-19.485570000000003,63.75],[-48.300070000000005,-12.54872,51.735040000000005],[-55.77212,0,30],[-48.300070000000005,12.548729999999999,8.26497],[-25,19.48558,-3.75],[0,14.349879999999999,5.14529],[-44.38494,22.19247,42.812830000000005],[-12.5,-0.73557,74.57531],[-24.15003,23.67633,72.64958],[-24.15004,48.77378,29.17951],[-12.5,38.23557,7.07531],[0,28.005360000000003,70.26315],[12.5,-0.73557,74.57531],[24.15004,23.67632,72.64958],[24.15004,48.77378,29.17951],[12.5,38.23557,7.07531],[25,-19.485570000000003,63.75],[25,19.485570000000003,-3.75],[2.9634500000000004,-9.62287,57.048449999999995],[-2.9634500000000004,-19.10651,53.11842],[0,48.87159,34.12178],[44.38494,22.19247,42.812830000000005],[-24.96639,36.09296,58.57365],[-24.96639,42.79198,46.9706],[-13.00902,45.148900000000005,53.066680000000005],[-13.00902,42.55078,57.566759999999995],[13.00903,42.55078,57.566759999999995],[13.00902,45.14891,53.066680000000005],[24.96639,42.79198,46.9706],[24.96639,36.09296,58.57365],[2.9634500000000004,-19.10651,53.11842],[-5.9269099999999995,-14.36469,55.08344],[-2.9634500000000004,-9.62287,57.048449999999995],[5.9269099999999995,-14.36469,55.08344]],"lines":[[0,1],[0,1],[0,29],[0,29],[1,34],[1,2],[1,2],[1,5],[1,5],[1,34],[2,30],[2,30],[3,4],[3,4],[3,43],[3,43],[4,5],[4,5],[5,10],[5,10],[5,6],[5,6],[6,7],[6,7],[7,18],[7,18],[8,9],[8,32],[8,9],[8,32],[9,10],[9,10],[10,15],[10,11],[10,11],[10,15],[11,12],[11,12],[12,18],[12,18],[13,44],[13,44],[13,14],[13,14],[14,15],[14,15],[15,19],[15,19],[15,16],[15,16],[16,17],[16,17],[17,18],[17,18],[18,23],[18,23],[18,28],[18,30],[18,30],[18,28],[19,36],[19,36],[19,35],[19,35],[20,21],[20,45],[20,45],[20,21],[21,38],[21,38],[21,35],[21,35],[22,37],[22,23],[22,36],[22,36],[22,23],[22,37],[24,39],[24,38],[24,38],[24,39],[25,31],[25,26],[25,31],[25,26],[26,42],[26,42],[26,39],[26,39],[27,41],[27,41],[27,28],[27,40],[27,28],[27,40],[29,46],[29,46],[33,37],[33,40],[33,37],[33,40],[34,42],[34,42],[34,41],[34,41]]},
+	evilpumpkinStem:{"color":"#090","points":[[5.9269099999999995,-14.36469,55.08344],[-2.9634500000000004,-9.62286,57.048449999999995],[-5.9269099999999995,-14.36469,55.08344],[2.9634500000000004,-19.10651,53.11842],[2.2725500000000003,-29.30986,66.74938],[-2.2725500000000003,-29.30986,66.74938],[-4.545100000000001,-26.69955,69.69553],[-2.2725500000000003,-24.08925,72.64166999999999],[2.2725500000000003,-24.08925,72.64166999999999],[4.545100000000001,-26.69955,69.69553],[2.9634500000000004,-12.986,68.33337],[-2.9634500000000004,-12.986,68.33337],[-5.9269099999999995,-17.35127,65.63326],[-2.9634500000000004,-21.716540000000002,62.93315],[2.9634500000000004,-21.716540000000002,62.93315],[5.9269099999999995,-17.35127,65.63326],[-2.9634500000000004,-19.10651,53.11842],[2.9634500000000004,-9.62286,57.048449999999995]],"lines":[[0,17],[0,15],[0,3],[0,15],[1,11],[1,2],[1,11],[1,17],[2,12],[2,16],[2,12],[3,14],[3,14],[3,16],[4,14],[4,14],[4,9],[4,5],[5,13],[5,6],[5,13],[6,12],[6,7],[6,12],[7,11],[7,8],[7,11],[8,10],[8,9],[8,10],[9,15],[9,15],[10,15],[10,17],[10,11],[10,15],[10,17],[10,11],[11,12],[11,12],[12,13],[12,13],[13,14],[13,16],[13,14],[13,16],[14,15],[14,15]]},
+	evilpumpkinEyes:{"color":"#f00","points":[[27.11535,-3.0106100000000002,94.52695],[46.05507,31.04924,68.68719],[5.0000100000000005,37.06185,80.87008],[-46.05506,31.049229999999998,68.68719],[-4.99999,37.06185,80.87008],[-27.11534,-3.01062,94.52694],[15.52841,29.381,81.11575],[36.05594,26.3747,75.02430000000001],[26.586080000000003,9.34478,87.94418],[-26.58607,9.34477,87.94416999999999],[-15.5284,29.381,81.11573999999999],[-36.05593,26.374689999999998,75.02429000000001]],"lines":[[0,2],[0,1],[0,1],[0,2],[1,2],[1,2],[3,5],[3,5],[3,4],[3,4],[4,5],[4,5],[6,7],[6,8],[7,8],[9,11],[9,10],[10,11]]},
+	heart:{"color":"#f0f","points":[[80,40,0],[0,100,0],[-80,40,0],[0,-50,0],[130,-60,0],[110,-100,0],[70,-110,0],[120,-10,0],[-120,-10,0],[-70,-110,0],[-110,-100,0],[-130,-60,0],[-130,-60,60],[-110,-100,60],[-70,-110,60],[-120,-10,60],[120,-10,60],[70,-110,60],[110,-100,60],[130,-60,60],[0,-50,60],[-80,40,60],[0,100,60],[80,40,60],[30,-90,0],[-30,-90,0],[-30,-90,60],[30,-90,60]],"lines":[[0,7],[0,23],[0,1],[0,23],[1,2],[1,22],[1,22],[2,21],[2,21],[2,8],[3,20],[3,25],[3,20],[3,24],[4,19],[4,5],[4,7],[4,19],[5,6],[5,18],[5,18],[6,17],[6,17],[6,24],[7,16],[7,16],[8,15],[8,15],[8,11],[9,25],[9,14],[9,14],[9,10],[10,13],[10,11],[10,13],[11,12],[11,12],[12,13],[12,15],[13,14],[14,26],[15,21],[16,19],[16,23],[17,27],[17,18],[18,19],[20,27],[20,26],[21,22],[22,23],[24,27],[24,27],[25,26],[25,26]]},
+	diamondInset:{"color":"#f09","points":[[0,-50,50],[0,0,0],[0,0,100],[50,0,50],[0,50,50],[-50,0,50],[10,-20,60],[10,-10,70],[20,-10,60],[-10,-20,60],[-20,-10,60],[-10,-10,70],[-10,-10,30],[-20,-10,40],[-10,-20,40],[10,-10,30],[20,-10,40],[10,-20,40],[10,10,30],[20,10,40],[10,20,40],[-10,10,30],[-20,10,40],[-10,20,40],[-10,10,70],[-10,20,60],[-20,10,60],[10,10,70],[10,20,60],[20,10,60]],"lines":[[0,1],[0,5],[0,5],[0,2],[0,2],[0,3],[0,3],[0,1],[1,5],[1,4],[1,4],[1,3],[1,3],[1,5],[2,4],[2,4],[2,5],[2,5],[2,3],[2,3],[3,4],[3,4],[4,5],[4,5],[6,8],[6,7],[7,8],[9,10],[9,11],[10,11],[12,14],[12,13],[13,14],[15,17],[15,16],[16,17],[18,19],[18,20],[19,20],[21,23],[21,22],[22,23],[24,25],[24,26],[25,26],[27,28],[27,29],[28,29]]},
+	diamondInside:{"color":"#90f","points":[[0,-50,50],[0,0,0],[0,0,100],[50,0,50],[0,50,50],[-50,0,50],[0,0,30],[-20,0,50],[0,-20,50],[0,0,70],[0,20,50],[20,0,50]],"lines":[[0,1],[0,5],[0,5],[0,2],[0,2],[0,3],[0,3],[0,1],[1,5],[1,4],[1,4],[1,3],[1,3],[1,5],[2,4],[2,4],[2,5],[2,5],[2,3],[2,3],[3,4],[3,4],[4,5],[4,5],[6,7],[6,11],[6,8],[6,10],[6,8],[6,7],[6,11],[6,10],[7,8],[7,10],[7,9],[7,9],[7,10],[7,8],[8,9],[8,9],[8,11],[8,11],[9,11],[9,10],[9,11],[9,10],[10,11],[10,11]]},
+	bullet:{"color":"#0ff","points":[[0,-10,0],[0,0,-20],[10,0,0],[0,10,0],[-10,0,0]],"lines":[[0,1],[0,1],[0,4],[0,2],[0,4],[0,2],[1,3],[1,2],[1,4],[1,2],[1,4],[1,3],[2,3],[2,3],[3,4],[3,4]]},
+	car:{"color":"#f00","points":[[-40,20,10],[-30,20,0],[-30,30,0],[-40,30,10],[-30,20,20],[-20,20,10],[-20,30,10],[-30,30,20],[30,30,20],[40,30,10],[40,20,10],[30,20,20],[20,30,10],[30,30,0],[30,20,0],[20,20,10],[20,-30,10],[30,-30,0],[30,-20,0],[20,-20,10],[30,-30,20],[40,-30,10],[40,-20,10],[30,-20,20],[-30,-20,20],[-20,-20,10],[-20,-30,10],[-30,-30,20],[-40,-20,10],[-30,-20,0],[-30,-30,0],[-40,-30,10],[-40,30,20],[-40,-30,20],[-30,-30,30],[-20,30,20],[-20,-30,20],[20,-30,20],[20,30,20],[30,30,30],[40,-30,20],[40,30,20],[60,20,20],[60,-20,20],[60,-20,30],[60,20,30],[50,30,30],[50,-30,30],[10,-10,60],[10,10,60],[-10,10,60],[-10,-10,60],[-50,-30,30],[-50,30,30],[-60,20,30],[-60,-20,30],[-60,-20,20],[-60,20,20],[30,-20,50],[30,20,50],[-30,-20,50],[-30,20,50],[30,-30,30],[-30,30,30],[-50,-30,20],[-50,30,20],[50,-30,20],[50,30,20]],"lines":[[0,1],[0,3],[0,4],[0,3],[0,1],[0,4],[1,5],[1,2],[1,5],[1,2],[2,6],[2,3],[2,6],[2,3],[3,7],[3,7],[4,7],[4,5],[4,5],[4,7],[5,6],[5,6],[6,7],[6,7],[8,9],[8,12],[8,11],[8,11],[8,9],[8,12],[9,10],[9,10],[9,13],[9,13],[10,14],[10,11],[10,11],[10,14],[11,15],[11,15],[12,13],[12,15],[12,13],[12,15],[13,14],[13,14],[14,15],[14,15],[16,20],[16,17],[16,19],[16,17],[16,19],[16,20],[17,21],[17,18],[17,21],[17,18],[18,22],[18,22],[18,19],[18,19],[19,23],[19,23],[20,23],[20,21],[20,23],[20,21],[21,22],[21,22],[22,23],[22,23],[24,27],[24,28],[24,27],[24,28],[24,25],[24,25],[25,26],[25,29],[25,26],[25,29],[26,27],[26,30],[26,27],[26,30],[27,31],[27,31],[28,29],[28,31],[28,31],[28,29],[29,30],[29,30],[30,31],[30,31],[32,63],[32,65],[32,65],[32,33],[32,63],[32,33],[33,64],[33,64],[33,34],[33,34],[34,63],[34,60],[34,63],[34,36],[34,62],[34,52],[34,52],[34,60],[34,62],[34,36],[35,38],[35,63],[35,38],[35,63],[35,36],[35,36],[36,37],[36,37],[37,38],[37,38],[37,62],[37,62],[38,39],[38,39],[39,62],[39,59],[39,62],[39,63],[39,46],[39,46],[39,41],[39,63],[39,59],[39,41],[40,41],[40,62],[40,66],[40,41],[40,62],[40,66],[41,67],[41,67],[42,43],[42,43],[42,67],[42,45],[42,67],[42,45],[43,66],[43,44],[43,66],[43,44],[44,47],[44,47],[44,45],[44,45],[45,46],[45,46],[46,67],[46,59],[46,47],[46,47],[46,67],[46,59],[47,62],[47,58],[47,62],[47,66],[47,58],[47,66],[48,58],[48,58],[48,49],[48,49],[48,51],[48,51],[49,59],[49,59],[49,50],[49,50],[50,51],[50,51],[50,61],[50,61],[51,60],[51,60],[52,55],[52,60],[52,60],[52,64],[52,53],[52,53],[52,64],[52,55],[53,61],[53,65],[53,54],[53,65],[53,54],[53,61],[53,63],[53,63],[54,57],[54,55],[54,57],[54,55],[55,56],[55,56],[56,57],[56,64],[56,57],[56,64],[57,65],[57,65],[58,62],[58,62],[58,60],[58,59],[58,59],[58,60],[59,61],[59,61],[60,61],[60,61],[61,63],[61,63],[64,65],[64,65],[66,67],[66,67]]},
+	treeRect:{"color":"#0a0","points":[[-20,-20,0],[20,-20,0],[20,20,0],[-20,20,0],[10,10,40],[-10,10,40],[10,-10,40],[-10,-10,40],[0,0,110],[-20,-20,90],[-20,20,90],[20,20,90],[20,-20,90],[-30,-30,70],[-30,30,70],[30,30,70],[30,-30,70],[-20,-20,40],[20,-20,40],[20,20,40],[-20,20,40]],"lines":[[0,7],[0,1],[0,7],[0,3],[0,1],[0,3],[1,6],[1,6],[1,2],[1,2],[2,4],[2,3],[2,4],[2,3],[3,5],[3,5],[4,19],[4,6],[4,19],[4,6],[4,5],[4,5],[5,20],[5,7],[5,20],[5,7],[6,7],[6,18],[6,7],[6,18],[7,17],[7,17],[8,10],[8,9],[8,10],[8,9],[8,12],[8,11],[8,11],[8,12],[9,12],[9,10],[9,13],[9,13],[9,12],[9,10],[10,14],[10,11],[10,11],[10,14],[11,15],[11,12],[11,15],[11,12],[12,16],[12,16],[13,17],[13,17],[13,14],[13,16],[13,14],[13,16],[14,20],[14,15],[14,15],[14,20],[15,19],[15,16],[15,19],[15,16],[16,18],[16,18],[17,20],[17,18],[17,18],[17,20],[18,19],[18,19],[19,20],[19,20]]},
+	treeDiag:{"color":"#6a0","points":[[0,-20,0],[20,0,0],[0,20,0],[-20,0,0],[0,-10,40],[10,0,40],[0,10,40],[-10,0,40],[-20,0,40],[0,20,40],[20,0,40],[0,-20,40],[0,0,110],[0,-30,90],[-30,0,90],[0,30,90],[30,0,90],[0,-40,70],[-40,0,70],[0,40,70],[40,0,70]],"lines":[[0,4],[0,1],[0,4],[0,3],[0,3],[0,1],[1,5],[1,2],[1,5],[1,2],[2,6],[2,6],[2,3],[2,3],[3,7],[3,7],[4,5],[4,7],[4,5],[4,11],[4,11],[4,7],[5,10],[5,6],[5,6],[5,10],[6,7],[6,9],[6,7],[6,9],[7,8],[7,8],[8,9],[8,9],[8,11],[8,11],[8,18],[8,18],[9,19],[9,10],[9,19],[9,10],[10,20],[10,11],[10,11],[10,20],[11,17],[11,17],[12,13],[12,16],[12,15],[12,14],[12,15],[12,14],[12,13],[12,16],[13,14],[13,16],[13,17],[13,17],[13,16],[13,14],[14,15],[14,18],[14,15],[14,18],[15,16],[15,19],[15,19],[15,16],[16,20],[16,20],[17,20],[17,18],[17,20],[17,18],[18,19],[18,19],[19,20],[19,20]]}
+};
+
+//So I previously had a rather simple plane in the shape above, but it was about a zillion b a zillion. Result? a 300K file. I'ma use a loop below and make it dynamically in 300 bytes.
+
+var planeGeom = {color:'#666',points:[],lines:[]};
+var planeX = 50;
+var planeY = 50;
+var pxh = planeX / 2;
+var pyh = planeX / 2;
+for(var x = 0; x < planeX; x += 1){
+	for(var y = 0; y < planeY; y += 1){
+		var p1Num = planeGeom.points.length;
+		var p2Num = p1Num + 1;
+		var point1 = [(x * 100) - (pxh * 100) + 50, (y * 100) - (pyh * 100) + 50, 0];
+		planeGeom.points[p1Num] = point1;
+		planeGeom.points[p2Num] = [point1[0],point1[1],10];
+		planeGeom.lines[planeGeom.lines.length] = [p1Num,p2Num];
+	}
+}
+
+//--------------------------------
+//Scene setup! This is where I use all of the above!
+//--------------------------------
+
+var mySprite = new sprite2D3D([0,0,-2],'nyan-sprite.png');
+for(var i = 0; i < 10; i += 1){
+	new sprite2D3D([rint(1000),rint(1000),rint(250)],'nyan-sprite.png');
+}
+
+//--------------------------------
+//A ship that I can control
+//--------------------------------
+var displayStatus = document.getElementById('displayStatus');
+var ship = new act3D(false,shipShape);
+ship.name = 'Your Ship';
+ship.health = 100;
+ship.speed = 3;
+ship.rotOrder = [2,1,0];
+ship.vel = [0,0];
+ship.drag = 0.9;
+ship.shapeList = [
+	shipShape,
+	shapes.diamondInside,
+	shapes.diamondInset,
+];
+ship.shapeState = 0;
+ship.update = function(){
+	var t = this;
+
+	if(kb.left){t.vel[0]-=t.speed;}
+	if(kb.right){t.vel[0]+=t.speed;}
+	if(kb.up){t.vel[1]-=t.speed;}
+	if(kb.down){t.vel[1]+=t.speed;}
+	if(kb.space){addBullet([t.pos[0],t.pos[1],t.pos[2]],t); kb.space = false;}
+	if(kb.one){
+		kb.one = false;
+		var newTarget = new act3D([t.pos[0],t.pos[1],t.pos[2]],shapes.treeRect);
+		newTarget.emitter = t;
+		rQ.push(newTarget);
+	}
+	if(kb.two){
+		kb.two = false;
+		var newTarget = new act3D([t.pos[0],t.pos[1],t.pos[2]],shapes.treeDiag);
+		newTarget.emitter = t;
+		rQ.push(newTarget);
+	}
+	if(kb.three){
+		kb.three = false;
+		var newTarget = new act3D([t.pos[0],t.pos[1],t.pos[2]],shapes.car);
+		newTarget.emitter = t;
+		rQ.push(newTarget);
+	}
+	if(kb.four){
+		t.shapeState += 1;
+		if(t.shapeState >= t.shapeList.length){t.shapeState = 0;}
+		t.shape = t.shapeList[t.shapeState];
+		kb.four = false;
+	}
+
+	if(Math.abs(t.vel[0]) > 0.0001 || Math.abs(t.vel[1]) > 0.0001){
+		t.pos[0] += t.vel[0];
+		t.pos[1] += t.vel[1];
+		t.vel[0] *= t.drag;
+		t.vel[1] *= t.drag;
+/*
+		t.rot = Math.atan2(t.vel[0],t.vel[1]);
+		if(t.pos[0] > cx + 16){t.pos[0] = -cx -16;}
+		if(t.pos[0] < -cx -16){t.pos[0] = cx + 16;}
+		if(t.pos[1] > cy + 16){t.pos[1] = -cy -16;}
+		if(t.pos[1] < -cy -16){t.pos[1] = cy + 16;}
+*/
+	}
+	t.rot[2] += tau/36;
+	t.rot[1] = Math.atan2(t.vel[0] * 0.06, -t.vel[1] * 0.06);
+	t.rot[0] = tau/4;
+	displayStatus.innerHTML = 'Ship health: '+t.health;
+	drawLines(t);
+	dealDamage(t);
+};
+
+rQ.push(ship);
+
+var makeEnemy = function(pos){
+	if(pos.length < 3){throw 'PROBLEM! You need to give 3 keys for the pos array!';}
+	var initPos = [pos[0],pos[1],pos[2]];
+	var evilPumpkin = new act3D(initPos,shapes.evilpumpkinBody);
+	evilPumpkin.name = 'EVILPUMPKIN!!!';
+	var evilPumpkinEyes = new ob3D(initPos,shapes.evilpumpkinEyes);
+	var evilPumpkinStem = new ob3D(initPos,shapes.evilpumpkinStem);
+	var scale = Math.random() + 0.2;
+	evilPumpkin.scale = [scale,scale,scale];
+	evilPumpkinEyes.scale = evilPumpkin.scale;
+	evilPumpkinStem.scale = evilPumpkin.scale;
+	evilPumpkinEyes.pos = evilPumpkin.pos;
+	evilPumpkinStem.pos = evilPumpkin.pos;
+	evilPumpkinEyes.rot = evilPumpkin.rot;
+	evilPumpkinStem.rot = evilPumpkin.rot;
+	evilPumpkin.actuallyDestroy = evilPumpkin.destroy;
+	evilPumpkin.update = function(){
+		drawLines(this);
+		dealDamage(this);
+		evilPumpkinEyes.update();
+		evilPumpkinStem.update();
+	}
+	evilPumpkin.destroy = function(){
+		makeEnemy([rint(512),rint(512),0]);
+		this.actuallyDestroy();
+	}
+	rQ.push(evilPumpkin);
+}
+
+for(var i = 0; i < 20; i += 1){
+	makeEnemy([rint(512),rint(512),0]);
+}
+
+
+//add a reference to the center...
+var centerObj = new ob3D([0,0,-0.05],centerPointShape);
+centerObj.update = function(){
+	this.pos[0] = ship.pos[0] + mpos[0];
+	this.pos[1] = ship.pos[1] + mpos[1];
+	drawLines(this);
+}
+rQ.push(centerObj);
+
+var heart = new ob3D([0,0,-0.05],shapes.heart);
+heart.stateList = [
+	[0.9,0.9,0.9],
+	[1,1,1],
+];
+heart.name = 'OMG I AM THE HEART!';
+heart.state = 0;
+heart.interpStep = 0;
+heart.interpSteps = 5;
+heart.update = function(){
+	var t = this;
+	//t.rot[0] += tau/360;
+	//t.rot[1] += tau/360;
+	
+	var nextState = (t.state + 1) % (t.stateList.length);
+	//console.log(nextState);
+	if(t.interpStep < t.interpSteps){
+		t.scale = nTerpolate(t.stateList[t.state],t.stateList[nextState],t.interpSteps,t.interpStep);
+		t.interpStep += 1;
+	}else{
+		heart.state = nextState;
+		t.interpStep = 0;
+	}
+	drawLines(t);
+}
+rQ.push(heart);
+
+
+//the -0.1 is so it doesn't render overlapping anything else at z:0 accidentally.
+//Why is that a problem?
+//Because I'm doing z-depth based on the position of the whole object right now. :P
+var plane = new ob3D([0,0,-0.1],planeGeom);
+//plane.shape.color='#333';
+plane.rot[2] = tau/12;
+plane.renderAlways = true;
+rQ.push(plane);
+//var plane = new ob3D([0,0,-400],shapes.plane);
+//rQ.push(plane);
+//var plane = new ob3D([0,0,-800],shapes.plane);
+//rQ.push(plane);
+
+//and 100 more at random positions
+/*
+for(var i = 0; i < 50; i += 1){
+	rQ.push(new ob3D([rint(500),rint(500),rint(250)]));
+}
+*/
+
+
+
+var addBullet = function(pos,emitter){
+	var bullet = new act3D(pos,shapes.bullet);
+	bullet.name = 'Bullet Bill';
+	bullet.rotOrder = [2,0,1];
+	bullet.rot[1] = tau / 4;
+	bullet.speed = 20;
+	bullet.life = 200;
+
+	bullet.rot[0] = Math.atan2(mpos[0],mpos[1]) - tau/4;
+	bullet.vel = [Math.sin(bullet.rot[0] + tau/4)*bullet.speed,Math.cos(bullet.rot[0] + tau/4)*bullet.speed];
+
+	if(emitter !== undefined){
+		bullet.emitter = emitter;
+		//Uhh.. turned out that adding the vel of the player controlled object to the bullet vel was really, really weird.
+/*
+		if(emitter.vel !== undefined){
+		 bullet.vel[0] += emitter.vel[0];
+		 bullet.vel[1] += emitter.vel[1];
+		}
+*/
+	}
+	bullet.update = function(){
+		//z=depth from the camera kill?
+		//if((this.boundingBox[0][2] + this.pos[2]) < clipFar){
+		//number of frames alive kill
+		if(this.life <= 0){
+			this.destroy();
+		}else{
+			this.life -= 1
+			drawLines(this);
+			dealDamage(this);
+			//this.pos[2] -= 10;
+			this.pos[0] += this.vel[0];
+			this.pos[1] += this.vel[1];
+			this.rot[2] += tau / 36;
+		}
+	}
+	rQ.push(bullet);
+};
+
+canvas.onmousedown = function(){
+	//var pos = [mpos[0] - camera[0], mpos[1] - camera[1], -camera[2]];
+	var pos = [ship.pos[0], ship.pos[1], 0];
+	//console.log(pos);
+	addBullet(pos,ship);
+	return false;
+};
+
+
+
+//--------------------------------
+//Misc.
+//--------------------------------
+
+var drawCircle = function(x,y,radius,color){
+	if(x instanceof Array){
+		var y=x[1], x = x[0];
+	}
+	var radius = radius || 8;
+	c.beginPath();
+	c.strokeStyle = color || '#0f0';
+	c.lineCap = 'round';
+	c.lineJoin = 'round';
+	c.lineWidth = 2;
+	c.arc(x,y, radius, 0, tau, false);
+	c.stroke();
+}
+
+//--------------------------------
+//The basic render loop
+//--------------------------------
+
+
+var resize = function(){
+	cx=Math.floor(w/2);
+	cy=Math.floor(h/2);
+	mpos.x = 0;
+	mpos.y = 0;
+	canvas.width=w;
+	canvas.height=h;
+	wph=w+h;
+}
+
+var update = function(){
+	w=window.innerWidth;
+	h=window.innerHeight;
+	if(wph != w+h){resize();}
+	c.fillStyle='#rgba(0,255,0,0.4)';
+	c.fillRect(0,0,w,h);
+	c.save();
+	//c.strokeStyle = '#fff';
+	c.translate(cx,cy);
+
+	//camera[0] = mpos[0];
+	//camera[1] = mpos[1];
+	camera[0] = -ship.pos[0];
+	camera[1] = -ship.pos[1];
+	if(scroll !== 0){camera[2] += (scroll / Math.abs(scroll)) * 50; scroll = 0;}
+
+	//depth sorting!
+	rQ.sort(function(a,b) {return a.pos[2] - b.pos[2]})
+
+	for(var i = 0; i < rQ.length; i += 1){
+		rQ[i].update();
+	}
+
+	drawCircle(0,0,256,'#666');
+	//ship.vel[0] = mpos[0]/20;
+	//ship.vel[1] = mpos[1]/20;
+
+	
+	//console.log(rQ[0].pos[0]);
+	c.restore();
+	//console.log(totalRotationCalculations);
+	stats.update();
+	setTimeout(update,1000/60);
+}
+
+var stats = new Stats();
+stats.domElement.style.position = 'absolute';
+stats.domElement.style.top = '0px';
+stats.domElement.style.right = '0px';
+document.body.appendChild( stats.domElement );
+
+update();
+</script></body>
+</html>

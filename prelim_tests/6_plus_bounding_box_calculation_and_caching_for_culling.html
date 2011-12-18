@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="generator" content="Admiral's Hands">
+<title></title>
+<style>
+*{
+	margin: 0px;
+	padding: 0px;
+	border: 0px;
+	outline: 0px;
+}
+html,body,#canvas{
+height: 100%;
+width: 100%;
+}
+body{
+	background-color: #000;
+}
+#canvas{
+	position: fixed;
+}
+#controls{
+	position: absolute;
+	top: 0px;
+	left: 0px;
+	padding: 16px;
+	background-color: rgba(255,255,255,0.1);
+	color: #9f0;
+	font-size: 12px;
+	line-height: 16px;
+	font-family: monospace;
+	white-space: pre-wrap;
+}
+</style>
+</head>
+<body><canvas id="canvas"></canvas>
+<div id="controls">The following controls do things:
+Arrows: move your ship
+Space: Fire a bullet
+1: Plant a tree
+2: Plant a different tree
+3: Plant a car
+4: Change ship type
+-
+Moving the shop controlls the camera X and Y
+Scrolling controlls camera Z
+</div>
+<script>
+//--------------------------------
+//Basic scene setup
+//--------------------------------
+
+var canvas = document.getElementById('canvas');
+var c = canvas.getContext('2d');
+var w=0,h=0,cx=0,cy=0,wph=0;
+var pi = Math.PI;
+var tau = pi * 2;
+
+//Field Of View; Important!
+var fov = 550;
+var clipNear = fov; //This line is also VERY important! Never have the clipNear less than the FOV!
+var clipFar = -1000;
+
+//Kind of a hack, but it works in a pinch.
+var camera = [0,0,0];
+
+//which is short for renderQueue - push ob3Ds into this to get them to show up in the scene
+//invoke [ob].destroy(); to remove an ob3D from the scene.
+var rQ = [];
+
+
+//--------------------------------
+//Basic input setup
+//--------------------------------
+
+var mpos = [0,0];
+window.onmousemove = function(e){mpos=[e.clientX - cx, e.clientY - cy];}
+
+var scroll=0;
+window.onmousewheel = function(e){scroll=e.wheelDelta;}; //Chrome
+window.addEventListener('DOMMouseScroll',function(e){scroll=e.detail;},false); //FireFox. Wut. You. Smokin.
+
+var keyList = [];
+keyList[32] = 'space';
+keyList[38] = 'up';
+keyList[40] = 'down';
+keyList[37] = 'left';
+keyList[39] = 'right';
+keyList[49] = 'one';
+keyList[50] = 'two';
+keyList[51] = 'three';
+keyList[52] = 'four';
+var kb = {};
+function setKey(e){
+	if(e.type == 'keyup'){val = false;}
+	else{val = true;}
+	if(keyList[e.keyCode]){
+		kb[keyList[e.keyCode]] = val;
+	}
+}
+window.onkeydown = setKey;
+window.onkeyup = setKey;
+
+
+//--------------------------------
+//This is where all of the 3D and math happens
+//--------------------------------
+
+
+var project3Dto2D = function(p3){
+	var scale = fov/(fov + -p3[2]), p2 = {};
+	p2.x = (p3[0] * scale);
+	p2.y = (p3[1] * scale);
+	p2.scale = scale;
+	return p2;
+};
+
+var getP3Offset = function(p3,offset){
+	//a quick hack to quickly add the offset of the object
+	var p3 = [p3[0]+offset[0], p3[1]+offset[1], p3[2]+offset[2]];
+	return p3;
+}
+
+var rotatePoint = function(x,y,rad){
+	var length = Math.sqrt((x * x) + (y * y));
+	var currentRad = Math.atan2(x,y);
+	x = Math.sin(currentRad - rad) * length;
+	y = Math.cos(currentRad - rad) * length;
+	var output = [x,y];
+	return output;
+}
+var totalRotationCalculations = 0;
+var getP3Rotated = function(p3,rot){
+	var x = p3[0], y = p3[1], z = p3[2];
+	var xr = rot[0], yr = rot[1], zr = rot[2];
+	//x...
+	if(xr !== 0){
+		var zy = rotatePoint(z,y,xr);
+		z = zy[0];
+		y = zy[1];
+		totalRotationCalculations += 1;
+	}
+	//y...
+	if(yr !== 0){
+		var xz = rotatePoint(x,z,yr);
+		x = xz[0];
+		z = xz[1];
+		totalRotationCalculations += 1;
+	}
+	//z...
+	if(zr !== 0){
+		var xy = rotatePoint(x,y,zr);
+		x = xy[0];
+		y = xy[1];
+		totalRotationCalculations += 1;
+	}
+	return [x,y,z];
+}
+
+var getP3String = function(p3){
+	return 'x:'+p3[0]+' y:'+p3[1]+' z:'+p3[2];
+}
+
+var calculateBoundingBox = function(o){
+	var p = o.rotatedPointCache[0];
+	//avoiding errors comparing 'undefined' to a number by setting initial values to the first point...
+	var xMin = p[0],xMax = p[0],yMin = p[1],yMax = p[1],zMin = p[2],zMax = p[2];
+	//starting at one in the loop because 0 was done on the line above
+	for(var i = 1; i < o.rotatedPointCache.length; i += 1){
+		var p = o.rotatedPointCache[i];
+		//x pair...
+		if(p[0] < xMin){xMin = p[0];}
+		if(p[0] > xMax){xMax = p[0];}
+		//y pair...
+		if(p[1] < yMin){yMin = p[1];}
+		if(p[1] > yMax){yMax = p[1];}
+		//z pair...
+		if(p[2] < zMin){zMin = p[2];}
+		if(p[2] > zMax){zMax = p[2];}
+	}
+	o.boundingBox = [[xMin,yMin,zMin],[xMax,yMax,zMax]];
+};
+
+var lineRenderLoop = function(o){
+	var computedPointList = [];
+	for(var i = 0; i < o.shape.points.length; i += 1){
+		//to make sure I'm not messing with the original array...
+		var point = [o.rotatedPointCache[i][0],o.rotatedPointCache[i][1],o.rotatedPointCache[i][2]];
+		point = getP3Offset(point, o.pos);
+		point = getP3Offset(point, camera);
+		computedPointList[i] = point;
+	}
+	for(var i = 0; i < o.shape.lines.length; i += 1){
+		//offset the points by the object's position
+		var p3a = computedPointList[o.shape.lines[i][0]];
+		var p3b = computedPointList[o.shape.lines[i][1]];
+		//if the depths of the first and second point in the line are not behind the camera...
+		//and the depths of the first and second point in the line are closer than the far plane...
+		if(p3a[2] < clipNear && p3b[2] < clipNear && p3a[2] > clipFar && p3b[2] > clipFar){
+			var p0 = project3Dto2D(p3a);
+			var p1 = project3Dto2D(p3b);
+			//If the line is completely off screen, do not bother rendering it.
+			if(((p0.x < cx && p0.x > -cx) || (p1.x < cx && p1.x > -cx)) && ((p0.y < cy && p0.y > -cy) || (p1.y < cy && p1.y > -cy))){
+				c.beginPath();
+				c.moveTo(p0.x,p0.y);
+				c.lineTo(p1.x,p1.y);
+				
+				c.strokeStyle= o.shape.lines[i][2] || o.shape.color || '#fff';
+				//c.lineWidth=2;
+				c.lineCap='round';
+				c.stroke();
+			}
+		}
+	}
+}
+
+var drawLines = function(o){
+	//I see no reason to check whether the rotation is different between processing each point,
+	//so I'll just do that once per frame and have a loop just for rotating the points.
+	if(o.lastRotString !== getP3String(o.rot)){
+		for(var i = 0; i < o.shape.points.length; i += 1){
+			//to make sure I'm not messing with the original array...
+			var point = [o.shape.points[i][0],o.shape.points[i][1],o.shape.points[i][2]];
+			point = getP3Rotated(point, o.rot);
+			o.rotatedPointCache[i] = point;
+		}
+		calculateBoundingBox(o);
+		o.lastRotString = getP3String(o.rot);
+	}
+
+	var bbMinOffset = getP3Offset(getP3Offset(o.boundingBox[0], o.pos), camera);
+	var bbMaxOffset = getP3Offset(getP3Offset(o.boundingBox[1], o.pos), camera);
+
+	if(o.renderAlways){
+		lineRenderLoop(o);
+		return;
+	}
+
+	//Checking to see if any part of the bounding box is in front on the camera and closer than the far plane before bothering to do anything else...
+	if(bbMinOffset[2] > clipFar && bbMinOffset[2] < clipNear && bbMaxOffset[2] > clipFar && bbMaxOffset[2] < clipNear){
+		//Alright. It's in front and not behind. Now is the bounding box even partially on screen?
+		//8 points determine the cube... let's start from the top left, spiraling down clockwise
+		var bbCube = [
+			[bbMinOffset[0],bbMinOffset[1],bbMaxOffset[2]],
+			[bbMaxOffset[0],bbMinOffset[1],bbMaxOffset[2]],
+			[bbMaxOffset[0],bbMaxOffset[1],bbMaxOffset[2]],
+			[bbMinOffset[0],bbMaxOffset[1],bbMaxOffset[2]],
+			[bbMinOffset[0],bbMinOffset[1],bbMinOffset[2]],
+			[bbMaxOffset[0],bbMinOffset[1],bbMinOffset[2]],
+			[bbMaxOffset[0],bbMaxOffset[1],bbMinOffset[2]],
+			[bbMinOffset[0],bbMaxOffset[1],bbMinOffset[2]],
+		];
+		var bbOffscreen = true;
+		//At some point in the future if I wanted to get really crazy, I could probably determine which order
+		//to sort the array above to orient the point closest to the center of the screen nearest the first of the list,
+		//so I don't bother checking all 8 points to determine if it's on screen - or even off screen.
+		for(var i = 0; i < bbCube.length && bbOffscreen; i += 1){
+			bbp = project3Dto2D(bbCube[i]);
+			if(bbp.x < cx && bbp.x > -cx && bbp.y < cy && bbp.y > -cy){
+				bbOffscreen = false;
+			}
+		}
+		if(!bbOffscreen){
+			lineRenderLoop(o);
+		}
+	}
+}
+
+//The only reason this isn't with the rest of the shapes is because I need to use it inside the prototype of ob3D
+var cubeShape = {
+	color:'#999',
+	points:[
+		[ 10, 10, 10],
+		[ 10, 10,-10],
+		[ 10,-10, 10],
+		[ 10,-10,-10],
+		[-10, 10, 10],
+		[-10, 10,-10],
+		[-10,-10, 10],
+		[-10,-10,-10]
+	],
+	lines:[
+		[0,1],
+		[2,3],
+		[4,5],
+		[6,7],
+		[3,1],
+		[2,0],
+		[7,5],
+		[6,4],
+		[5,1],
+		[7,3],
+		[4,0],
+		[6,2]
+	],
+};
+
+var ob3D = function(pos,shape){
+	if(this === window){throw 'JIM TYPE ERROR'};
+	this.pos = pos || [0,0,0];
+	this.rot = [0,0,0];
+	this.lastRotString = false;
+	this.rotatedPointCache = [];
+	this.boundingBox = [[0,0,0],[0,0,0]];
+	if(shape){this.shape = shape;}
+	return this;
+}
+
+ob3D.prototype = {
+	renderAlways: false,
+	shape: cubeShape,
+	pos:[0,0,0],
+	update:function(){
+		drawLines(this);
+	},
+	destroy:function(){
+		for(var i = 0; i < rQ.length; i += 1){
+			if(rQ[i] === this){
+				rQ.splice(i,1);
+			}
+		}
+	}
+};
+
+var rint = function(num){
+	return Math.round(((Math.random()*2)-1)*num);
+}
+
+
+//--------------------------------
+//Some Meshes to play with!
+//--------------------------------
+//I wrote this one by hand...
+var shipShape = {
+	points:[
+		[20,0,0],
+		[0,20,0],
+		[-20,0,0],
+		[0,-20,0],
+		[40,0,0],
+		[10,0,10],
+		[0,10,10],
+		[-10,0,10],
+		[0,-10,10],
+		[0,40,0],
+		[-40,0,0],
+		[0,-40,0],
+		[0,0,-40]
+	],
+	lines:[
+		[12,4,'#f3c'],
+		[12,9,'#f3c'],
+		[12,10,'#f3c'],
+		[12,11,'#f3c'],
+		[9,4,'#93c'],
+		[10,9,'#93c'],
+		[11,10,'#93c'],
+		[4,11,'#93c'],
+
+		[5,0,'#06f'],
+		[6,1,'#06f'],
+		[7,2,'#06f'],
+		[8,3,'#06f'],
+		[0,1,'#03c'],
+		[1,2,'#03c'],
+		[2,3,'#03c'],
+		[3,0,'#03c'],
+		[5,6,'#09f'],
+		[6,7,'#09f'],
+		[7,8,'#09f'],
+		[8,5,'#09f'],
+		[0,4,'#f3c'],
+		[1,9,'#f3c'],
+		[2,10,'#f3c'],
+		[3,11,'#f3c']
+	]
+};
+var centerPointShape = {
+	color:'#0f0',
+	points:[
+		[10,-10,0],
+		[-10,10,0],
+		[10,10,0],
+		[-10,-10,0]
+	],
+	lines:[
+		[0,1],
+		[2,3]
+	]
+};
+//and I wrote another JS document to convert an OBJ file exported from Blender to generate this one.
+var shapes = {
+	heart:{"color":"#f6f","points":[[80,40,0],[0,100,0],[-80,40,0],[0,-50,0],[130,-60,0],[110,-100,0],[70,-110,0],[120,-10,0],[-120,-10,0],[-70,-110,0],[-110,-100,0],[-130,-60,0],[-130,-60,60],[-110,-100,60],[-70,-110,60],[-120,-10,60],[120,-10,60],[70,-110,60],[110,-100,60],[130,-60,60],[0,-50,60],[-80,40,60],[0,100,60],[80,40,60],[30,-90,0],[-30,-90,0],[-30,-90,60],[30,-90,60]],"lines":[[0,7],[0,23],[0,1],[0,23],[1,2],[1,22],[1,22],[2,21],[2,21],[2,8],[3,20],[3,25],[3,20],[3,24],[4,19],[4,5],[4,7],[4,19],[5,6],[5,18],[5,18],[6,17],[6,17],[6,24],[7,16],[7,16],[8,15],[8,15],[8,11],[9,25],[9,14],[9,14],[9,10],[10,13],[10,11],[10,13],[11,12],[11,12],[12,13],[12,15],[13,14],[14,26],[15,21],[16,19],[16,23],[17,27],[17,18],[18,19],[20,27],[20,26],[21,22],[22,23],[24,27],[24,27],[25,26],[25,26]]},
+	diamondInset:{"color":"#f09","points":[[0,-50,50],[0,0,0],[0,0,100],[50,0,50],[0,50,50],[-50,0,50],[10,-20,60],[10,-10,70],[20,-10,60],[-10,-20,60],[-20,-10,60],[-10,-10,70],[-10,-10,30],[-20,-10,40],[-10,-20,40],[10,-10,30],[20,-10,40],[10,-20,40],[10,10,30],[20,10,40],[10,20,40],[-10,10,30],[-20,10,40],[-10,20,40],[-10,10,70],[-10,20,60],[-20,10,60],[10,10,70],[10,20,60],[20,10,60]],"lines":[[0,1],[0,5],[0,5],[0,2],[0,2],[0,3],[0,3],[0,1],[1,5],[1,4],[1,4],[1,3],[1,3],[1,5],[2,4],[2,4],[2,5],[2,5],[2,3],[2,3],[3,4],[3,4],[4,5],[4,5],[6,8],[6,7],[7,8],[9,10],[9,11],[10,11],[12,14],[12,13],[13,14],[15,17],[15,16],[16,17],[18,19],[18,20],[19,20],[21,23],[21,22],[22,23],[24,25],[24,26],[25,26],[27,28],[27,29],[28,29]]},
+	diamondInside:{"color":"#90f","points":[[0,-50,50],[0,0,0],[0,0,100],[50,0,50],[0,50,50],[-50,0,50],[0,0,30],[-20,0,50],[0,-20,50],[0,0,70],[0,20,50],[20,0,50]],"lines":[[0,1],[0,5],[0,5],[0,2],[0,2],[0,3],[0,3],[0,1],[1,5],[1,4],[1,4],[1,3],[1,3],[1,5],[2,4],[2,4],[2,5],[2,5],[2,3],[2,3],[3,4],[3,4],[4,5],[4,5],[6,7],[6,11],[6,8],[6,10],[6,8],[6,7],[6,11],[6,10],[7,8],[7,10],[7,9],[7,9],[7,10],[7,8],[8,9],[8,9],[8,11],[8,11],[9,11],[9,10],[9,11],[9,10],[10,11],[10,11]]},
+	bullet:{"color":"#0ff","points":[[0,-10,0],[0,0,-20],[10,0,0],[0,10,0],[-10,0,0]],"lines":[[0,1],[0,1],[0,4],[0,2],[0,4],[0,2],[1,3],[1,2],[1,4],[1,2],[1,4],[1,3],[2,3],[2,3],[3,4],[3,4]]},
+	car:{"color":"#f00","points":[[-40,20,10],[-30,20,0],[-30,30,0],[-40,30,10],[-30,20,20],[-20,20,10],[-20,30,10],[-30,30,20],[30,30,20],[40,30,10],[40,20,10],[30,20,20],[20,30,10],[30,30,0],[30,20,0],[20,20,10],[20,-30,10],[30,-30,0],[30,-20,0],[20,-20,10],[30,-30,20],[40,-30,10],[40,-20,10],[30,-20,20],[-30,-20,20],[-20,-20,10],[-20,-30,10],[-30,-30,20],[-40,-20,10],[-30,-20,0],[-30,-30,0],[-40,-30,10],[-40,30,20],[-40,-30,20],[-30,-30,30],[-20,30,20],[-20,-30,20],[20,-30,20],[20,30,20],[30,30,30],[40,-30,20],[40,30,20],[60,20,20],[60,-20,20],[60,-20,30],[60,20,30],[50,30,30],[50,-30,30],[10,-10,60],[10,10,60],[-10,10,60],[-10,-10,60],[-50,-30,30],[-50,30,30],[-60,20,30],[-60,-20,30],[-60,-20,20],[-60,20,20],[30,-20,50],[30,20,50],[-30,-20,50],[-30,20,50],[30,-30,30],[-30,30,30],[-50,-30,20],[-50,30,20],[50,-30,20],[50,30,20]],"lines":[[0,1],[0,3],[0,4],[0,3],[0,1],[0,4],[1,5],[1,2],[1,5],[1,2],[2,6],[2,3],[2,6],[2,3],[3,7],[3,7],[4,7],[4,5],[4,5],[4,7],[5,6],[5,6],[6,7],[6,7],[8,9],[8,12],[8,11],[8,11],[8,9],[8,12],[9,10],[9,10],[9,13],[9,13],[10,14],[10,11],[10,11],[10,14],[11,15],[11,15],[12,13],[12,15],[12,13],[12,15],[13,14],[13,14],[14,15],[14,15],[16,20],[16,17],[16,19],[16,17],[16,19],[16,20],[17,21],[17,18],[17,21],[17,18],[18,22],[18,22],[18,19],[18,19],[19,23],[19,23],[20,23],[20,21],[20,23],[20,21],[21,22],[21,22],[22,23],[22,23],[24,27],[24,28],[24,27],[24,28],[24,25],[24,25],[25,26],[25,29],[25,26],[25,29],[26,27],[26,30],[26,27],[26,30],[27,31],[27,31],[28,29],[28,31],[28,31],[28,29],[29,30],[29,30],[30,31],[30,31],[32,63],[32,65],[32,65],[32,33],[32,63],[32,33],[33,64],[33,64],[33,34],[33,34],[34,63],[34,60],[34,63],[34,36],[34,62],[34,52],[34,52],[34,60],[34,62],[34,36],[35,38],[35,63],[35,38],[35,63],[35,36],[35,36],[36,37],[36,37],[37,38],[37,38],[37,62],[37,62],[38,39],[38,39],[39,62],[39,59],[39,62],[39,63],[39,46],[39,46],[39,41],[39,63],[39,59],[39,41],[40,41],[40,62],[40,66],[40,41],[40,62],[40,66],[41,67],[41,67],[42,43],[42,43],[42,67],[42,45],[42,67],[42,45],[43,66],[43,44],[43,66],[43,44],[44,47],[44,47],[44,45],[44,45],[45,46],[45,46],[46,67],[46,59],[46,47],[46,47],[46,67],[46,59],[47,62],[47,58],[47,62],[47,66],[47,58],[47,66],[48,58],[48,58],[48,49],[48,49],[48,51],[48,51],[49,59],[49,59],[49,50],[49,50],[50,51],[50,51],[50,61],[50,61],[51,60],[51,60],[52,55],[52,60],[52,60],[52,64],[52,53],[52,53],[52,64],[52,55],[53,61],[53,65],[53,54],[53,65],[53,54],[53,61],[53,63],[53,63],[54,57],[54,55],[54,57],[54,55],[55,56],[55,56],[56,57],[56,64],[56,57],[56,64],[57,65],[57,65],[58,62],[58,62],[58,60],[58,59],[58,59],[58,60],[59,61],[59,61],[60,61],[60,61],[61,63],[61,63],[64,65],[64,65],[66,67],[66,67]]},
+	treeRect:{"color":"#0a0","points":[[-20,-20,0],[20,-20,0],[20,20,0],[-20,20,0],[10,10,40],[-10,10,40],[10,-10,40],[-10,-10,40],[0,0,110],[-20,-20,90],[-20,20,90],[20,20,90],[20,-20,90],[-30,-30,70],[-30,30,70],[30,30,70],[30,-30,70],[-20,-20,40],[20,-20,40],[20,20,40],[-20,20,40]],"lines":[[0,7],[0,1],[0,7],[0,3],[0,1],[0,3],[1,6],[1,6],[1,2],[1,2],[2,4],[2,3],[2,4],[2,3],[3,5],[3,5],[4,19],[4,6],[4,19],[4,6],[4,5],[4,5],[5,20],[5,7],[5,20],[5,7],[6,7],[6,18],[6,7],[6,18],[7,17],[7,17],[8,10],[8,9],[8,10],[8,9],[8,12],[8,11],[8,11],[8,12],[9,12],[9,10],[9,13],[9,13],[9,12],[9,10],[10,14],[10,11],[10,11],[10,14],[11,15],[11,12],[11,15],[11,12],[12,16],[12,16],[13,17],[13,17],[13,14],[13,16],[13,14],[13,16],[14,20],[14,15],[14,15],[14,20],[15,19],[15,16],[15,19],[15,16],[16,18],[16,18],[17,20],[17,18],[17,18],[17,20],[18,19],[18,19],[19,20],[19,20]]},
+	treeDiag:{"color":"#6a0","points":[[0,-20,0],[20,0,0],[0,20,0],[-20,0,0],[0,-10,40],[10,0,40],[0,10,40],[-10,0,40],[-20,0,40],[0,20,40],[20,0,40],[0,-20,40],[0,0,110],[0,-30,90],[-30,0,90],[0,30,90],[30,0,90],[0,-40,70],[-40,0,70],[0,40,70],[40,0,70]],"lines":[[0,4],[0,1],[0,4],[0,3],[0,3],[0,1],[1,5],[1,2],[1,5],[1,2],[2,6],[2,6],[2,3],[2,3],[3,7],[3,7],[4,5],[4,7],[4,5],[4,11],[4,11],[4,7],[5,10],[5,6],[5,6],[5,10],[6,7],[6,9],[6,7],[6,9],[7,8],[7,8],[8,9],[8,9],[8,11],[8,11],[8,18],[8,18],[9,19],[9,10],[9,19],[9,10],[10,20],[10,11],[10,11],[10,20],[11,17],[11,17],[12,13],[12,16],[12,15],[12,14],[12,15],[12,14],[12,13],[12,16],[13,14],[13,16],[13,17],[13,17],[13,16],[13,14],[14,15],[14,18],[14,15],[14,18],[15,16],[15,19],[15,19],[15,16],[16,20],[16,20],[17,20],[17,18],[17,20],[17,18],[18,19],[18,19],[19,20],[19,20]]},
+};
+
+//So I previously had a rather simple plane in the shape above, but it was about a zillion b a zillion. Result? a 300K file. I'ma use a loop below and make it dynamically in 300 bytes.
+
+var planeGeom = {color:'#099',points:[],lines:[]};
+var planeX = 101;
+var planeY = 101;
+var pxh = planeX / 2;
+var pyh = planeX / 2;
+for(var x = 0; x < planeX; x += 1){
+	for(var y = 0; y < planeY; y += 1){
+		var p1Num = planeGeom.points.length;
+		var p2Num = p1Num + 1;
+		var point1 = [(x * 100) - (pxh * 100) + 50, (y * 100) - (pyh * 100) + 50, 0];
+		planeGeom.points[p1Num] = point1;
+		planeGeom.points[p2Num] = [point1[0],point1[1],10];
+		planeGeom.lines[planeGeom.lines.length] = [p1Num,p2Num];
+	}
+}
+
+//--------------------------------
+//A ship that I can control
+//--------------------------------
+
+var ship = new ob3D(false,shipShape);
+ship.speed = 3;
+ship.vel = [0,0];
+ship.drag = 0.9;
+ship.shapeList = [
+	shipShape,
+	shapes.diamondInside,
+	shapes.diamondInset,
+];
+ship.shapeState = 0;
+ship.update = function(){
+	var t = this;
+
+	if(kb.left){t.vel[0]-=t.speed;}
+	if(kb.right){t.vel[0]+=t.speed;}
+	if(kb.up){t.vel[1]-=t.speed;}
+	if(kb.down){t.vel[1]+=t.speed;}
+	if(kb.space){addBullet([t.pos[0],t.pos[1],t.pos[2]]); kb.space = false;}
+	if(kb.one){rQ.push(new ob3D([t.pos[0],t.pos[1],t.pos[2]],shapes.treeRect)); kb.one = false;}
+	if(kb.two){rQ.push(new ob3D([t.pos[0],t.pos[1],t.pos[2]],shapes.treeDiag)); kb.two = false;}
+	if(kb.three){rQ.push(new ob3D([t.pos[0],t.pos[1],t.pos[2]],shapes.car)); kb.three = false;}
+	if(kb.four){
+		t.shapeState += 1;
+		if(t.shapeState >= t.shapeList.length){t.shapeState = 0;}
+		t.shape = t.shapeList[t.shapeState];
+		kb.four = false;
+	}
+
+	if(Math.abs(t.vel[0]) > 0.0001 || Math.abs(t.vel[1]) > 0.0001){
+		t.pos[0] += t.vel[0];
+		t.pos[1] += t.vel[1];
+		t.vel[0] *= t.drag;
+		t.vel[1] *= t.drag;
+/*
+		t.rot = Math.atan2(t.vel[0],t.vel[1]);
+		if(t.pos[0] > cx + 16){t.pos[0] = -cx -16;}
+		if(t.pos[0] < -cx -16){t.pos[0] = cx + 16;}
+		if(t.pos[1] > cy + 16){t.pos[1] = -cy -16;}
+		if(t.pos[1] < -cy -16){t.pos[1] = cy + 16;}
+*/
+	}
+	drawLines(t);
+};
+
+rQ.push(ship);
+
+
+//add a reference to the center...
+var centerObj = new ob3D([0,0,-0.05],centerPointShape);
+rQ.push(centerObj);
+
+var heart = new ob3D([0,0,-0.05],shapes.heart);
+heart.update = function(){
+	//this.rot[0] += tau/360;
+	//this.rot[1] += tau/360;
+	this.rot[2] += tau/360;
+	drawLines(this);
+}
+rQ.push(heart);
+
+
+//the -0.1 is so it doesn't render overlapping anything else at z:0 accidentally.
+//Why is that a problem?
+//Because I'm doing z-depth based on the position of the whole object right now. :P
+var plane = new ob3D([0,0,-0.1],planeGeom);
+//plane.shape.color='#333';
+plane.rot[2] = tau/8;
+plane.renderAlways = true;
+rQ.push(plane);
+//var plane = new ob3D([0,0,-400],shapes.plane);
+//rQ.push(plane);
+//var plane = new ob3D([0,0,-800],shapes.plane);
+//rQ.push(plane);
+
+//and 100 more at random positions
+/*
+for(var i = 0; i < 50; i += 1){
+	rQ.push(new ob3D([rint(500),rint(500),rint(250)]));
+}
+*/
+
+
+
+var addBullet = function(pos){
+	var bullet = new ob3D(pos,shapes.car);
+	bullet.update = function(){
+		drawLines(this);
+		this.pos[2] -= 10;
+		this.rot[1] += tau / 36;
+		if(this.pos[2] < clipFar){
+			this.destroy();
+		}
+	}
+	rQ.push(bullet);
+};
+
+canvas.onclick = function(){
+	var pos = [mpos[0] - camera[0], mpos[1] - camera[1], -camera[2]];
+	//console.log(pos);
+	addBullet(pos);
+};
+
+//You'll see why this is a silly variable name in the render loop. At least it's not hammerTime.
+var bulletTime = 0;
+
+//--------------------------------
+//Where da sprites at!
+//--------------------------------
+
+
+var drawSprite = function(o){
+	//offset the points by the object's position
+	var p3 = o.pos;
+	//TOTALLY A HACK TO GET SOME CAMERA MOVEMENT
+	var p3 = getP3Offset(p3, [camera[0],camera[1],camera[2]]);
+	if( p3[2] < clipNear && p3[2] > clipFar ){
+		var p2 = project3Dto2D(p3);
+		//Just some basic positional culling... if it's not on screen, don't render it...
+		if((p2.x + (o.offset.x * p2.scale) < cx && p2.x - (o.offset.x * p2.scale) > -cx) && (p2.y + (o.offset.y * p2.scale) < cy && p2.y - (o.offset.y * p2.scale) > -cy)){
+			c.save();
+			c.translate(p2.x,p2.y);
+			c.scale(p2.scale,p2.scale);
+			c.rotate(o.rot);
+			c.drawImage(o.image,o.offset.x,o.offset.y );
+			c.restore();
+		}
+	}
+}
+
+var sprite2D3D = function(pos,path){
+	if(this === window){throw 'JIM TYPE ERROR'};
+	var t = this;
+	this.pos = pos || [0,0,0];
+	this.image = new Image();
+	this.image.onload = function(){
+		t.offset = {
+			x:-Math.round(t.image.width/2),
+			y:-Math.round(t.image.height/2)
+		};
+		rQ.push(t);
+		//console.log(t);
+	};
+	this.image.src = path;
+	return this;
+}
+
+sprite2D3D.prototype = {
+	pos:[0,0,0],
+	rot:0,
+	update:function(){
+		this.rot += tau/360;
+		drawSprite(this);
+	},
+	destroy:function(){
+		for(var i = 0; i < rQ.length; i += 1){
+			if(rQ[i] === this){
+				rQ.splice(i,1);
+			}
+		}
+	}
+};
+
+var mySprite = new sprite2D3D([0,0,-2],'nyan-sprite.png');
+for(var i = 0; i < 10; i += 1){
+	new sprite2D3D([rint(1000),rint(1000),rint(250)],'nyan-sprite.png');
+}
+
+//--------------------------------
+//The basic render loop
+//--------------------------------
+
+var resize = function(){
+	cx=Math.floor(w/2);
+	cy=Math.floor(h/2);
+	mpos.x = 0;
+	mpos.y = 0;
+	canvas.width=w;
+	canvas.height=h;
+	wph=w+h;
+}
+
+var update = function(){
+	w=window.innerWidth;
+	h=window.innerHeight;
+	if(wph != w+h){resize();}
+	c.fillStyle='#rgba(0,255,0,0.4)';
+	c.fillRect(0,0,w,h);
+	c.save();
+	//c.strokeStyle = '#fff';
+	c.translate(cx,cy);
+
+	//camera[0] = mpos[0];
+	//camera[1] = mpos[1];
+	camera[0] += -ship.vel[0];
+	camera[1] += -ship.vel[1];
+	if(scroll !== 0){camera[2] += (scroll / Math.abs(scroll)) * 50; scroll = 0;}
+
+	//depth sorting!
+	rQ.sort(function(a,b) {return a.pos[2] - b.pos[2]})
+
+	for(var i = 0; i < rQ.length; i += 1){
+		rQ[i].update();
+	}
+
+	bulletTime++;
+	if(bulletTime > 10){
+		bulletTime = 0;
+		addBullet([rint(1000),rint(1000),500]);
+	}
+	
+	//console.log(rQ[0].pos[0]);
+	c.restore();
+	//console.log(totalRotationCalculations);
+	setTimeout(update,1000/60);
+}
+
+update();
+</script></body>
+</html>

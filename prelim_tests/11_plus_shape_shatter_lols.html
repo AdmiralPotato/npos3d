@@ -1,0 +1,1129 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="generator" content="Admiral's Hands">
+<title></title>
+<style>
+*{
+	margin: 0px;
+	padding: 0px;
+	border: 0px;
+	outline: 0px;
+}
+html,body,#canvas{
+height: 100%;
+width: 100%;
+}
+body{
+	background-color: #000;
+}
+#canvas{
+	position: fixed;
+	cursor: none;
+}
+#controls{
+	position: absolute;
+	top: 0px;
+	left: 0px;
+	padding: 16px;
+	background-color: rgba(255,255,255,0.1);
+	color: #9f0;
+	font-size: 12px;
+	line-height: 16px;
+	font-family: monospace;
+	white-space: pre-wrap;
+}
+</style>
+</head>
+<body><canvas id="canvas"></canvas>
+<div id="controls">The following controls do things:
+Arrows / WSAD: move your ship
+Space: Fire a bullet
+1: Plant a tree
+2: Plant a different tree
+3: Plant a car
+4: Change ship type
+-
+Moving the shop controlls the camera X and Y
+Scrolling controlls camera Z
+<div id="displayStatus">!</div>
+</div>
+<script src="Stats.js"></script><script>
+//--------------------------------
+//Basic scene setup
+//--------------------------------
+
+var canvas = document.getElementById('canvas');
+var c = canvas.getContext('2d');
+var w=0,h=0,cx=0,cy=0,wph=0;
+var pi = Math.PI;
+var tau = pi * 2;
+var deg = tau / 360;
+
+//Field Of View; Important!
+var fov = 550;
+var clipNear = fov; //This line is also VERY important! Never have the clipNear less than the FOV!
+var clipFar = -1000;
+
+//Kind of a hack, but it works in a pinch.
+var camera = [0,0,0];
+
+//which is short for renderQueue - push ob3Ds into this to get them to show up in the scene
+//invoke [ob].destroy(); to remove an ob3D from the scene.
+var rQ = [];
+
+//--------------------------------
+//Basic input setup
+//--------------------------------
+
+var mpos = [0,0];
+window.onmousemove = function(e){mpos=[e.clientX - cx, e.clientY - cy];}
+
+var scroll=0;
+window.onmousewheel = function(e){scroll=e.wheelDelta;}; //Chrome
+window.addEventListener('DOMMouseScroll',function(e){scroll=e.detail;},false); //FireFox. Wut. You. Smokin.
+
+var keyList = [];
+keyList[32] = 'space';
+keyList[38] = 'up';
+keyList[40] = 'down';
+keyList[37] = 'left';
+keyList[39] = 'right';
+keyList[49] = 'one';
+keyList[50] = 'two';
+keyList[51] = 'three';
+keyList[52] = 'four';
+//Hot crap! I never thought of this before, but this control method allows double function mapping! YES!
+keyList[87] = 'up'; //w
+keyList[83] = 'down'; //s
+keyList[65] = 'left'; //a
+keyList[68] = 'right'; //d
+var kb = {};
+function setKey(e){
+	//console.log(e.keyCode);
+	if(e.type == 'keyup'){val = false;}
+	else{val = true;}
+	if(keyList[e.keyCode]){
+		kb[keyList[e.keyCode]] = val;
+	}
+}
+window.onkeydown = setKey;
+window.onkeyup = setKey;
+
+
+//--------------------------------
+//This is where all of the 3D and math happens
+//--------------------------------
+
+
+var project3Dto2D = function(p3){
+	//return {x:p3[0],y:p3[1]};
+	var scale = fov/(fov + -p3[2]), p2 = {};
+	p2.x = (p3[0] * scale);
+	p2.y = (p3[1] * scale);
+	p2.scale = scale;
+	return p2;
+};
+
+
+
+
+var rotatePoint = function(x,y,rad){
+	var length = Math.sqrt((x * x) + (y * y));
+	var currentRad = Math.atan2(x,y);
+	x = Math.sin(currentRad - rad) * length;
+	y = Math.cos(currentRad - rad) * length;
+	var output = [x,y];
+	return output;
+}
+var totalRotationCalculations = 0;
+var getP3Rotated = function(p3,rot,order){
+	//return p3;
+	var x = p3[0], y = p3[1], z = p3[2];
+	var xr = rot[0], yr = rot[1], zr = rot[2];
+	//Alright, here's something interesting.
+	//The order you rotate the dimentions is IMPORTANT to rotation animation!
+	//Here's my quick, no math approach to applying that.
+	for(var r = 0; r < order.length; r += 1){
+		if(order[r] === 0){
+			//x...
+			if(xr !== 0){
+				var zy = rotatePoint(z,y,xr);
+				z = zy[0];
+				y = zy[1];
+				totalRotationCalculations += 1;
+			}
+		}else if(order[r] === 1){
+			//y...
+			if(yr !== 0){
+				var xz = rotatePoint(x,z,yr);
+				x = xz[0];
+				z = xz[1];
+				totalRotationCalculations += 1;
+			}
+		}else if(order[r] === 2){
+			//z...
+			if(zr !== 0){
+				var xy = rotatePoint(x,y,zr);
+				x = xy[0];
+				y = xy[1];
+				totalRotationCalculations += 1;
+			}
+		}else{
+			throw 'up';
+		}
+	}
+	return [x,y,z];
+}
+var getP3Scaled = function(p3,scale){
+	//return p3;
+	return [p3[0]*scale[0], p3[1]*scale[1], p3[2]*scale[2]];;
+}
+
+//I used to use a function in here named nGetOffsets that would do the same thing, looping through dimentions.
+//It was TERRIBLY inefficient at this task, so I replaced it in favor of nDimention specific versions.
+var getP3Offset = function(p3,offset){
+	//an efficient hack to quickly add an offset to a 3D point
+	return [p3[0]+offset[0], p3[1]+offset[1], p3[2]+offset[2]];
+}
+var getP2Offset = function(p2,offset){
+	//an efficient hack to quickly add an offset to a 2D point
+	return [p2[0]+offset[0], p2[1]+offset[1]];
+}
+
+
+var getP3String = function(p3){
+	return 'x:'+p3[0]+' y:'+p3[1]+' z:'+p3[2];
+}
+
+var nGetBounds = function(pointList){
+	//Works for 2D, 3D, and nD!
+	var min = [];
+	var max = [];
+	var p = pointList[0];
+	for(var d = 0; d < p.length; d += 1){
+		min[d] = p[d]; max[d] = p[d];
+	}
+	for(var i = 1; i < pointList.length; i += 1){
+		var p = pointList[i];
+		//d stands for dimention
+		for(var d = 0; d < p.length; d += 1){
+			if(p[d] < min[d]){min[d] = p[d];}
+			else if(p[d] > max[d]){max[d] = p[d];}
+		}
+	}
+	return [min,max];
+}
+
+var lineRenderLoop = function(o){
+	var computedPointList = [];
+	for(var i = 0; i < o.shape.points.length; i += 1){
+		//to make sure I'm not messing with the original array...
+		var point = [o.transformedPointCache[i][0],o.transformedPointCache[i][1],o.transformedPointCache[i][2]];
+		point = getP3Offset(point, o.pos);
+		point = getP3Offset(point, camera);
+		computedPointList[i] = point;
+	}
+	for(var i = 0; i < o.shape.lines.length; i += 1){
+		//offset the points by the object's position
+		if(o.explosionFrame === undefined){
+			var p3a = computedPointList[o.shape.lines[i][0]];
+			var p3b = computedPointList[o.shape.lines[i][1]];
+		}else{
+			//O great architect of all source that is far more elegant than that of my own,
+			//please forgive me for the sins that I am about to commit with my limited remaining brain power... (6 AM)
+			var t3a = o.transformedPointCache[o.shape.lines[i][0]];
+			var t3b = o.transformedPointCache[o.shape.lines[i][1]];
+			t3a = getP3Offset(t3a,[0,0,0]);
+			t3b = getP3Offset(t3b,[0,0,0]);
+			var lineCenter = [
+				t3a[0] + ((t3b[0] - t3a[0]) /2),
+				t3a[1] + ((t3b[1] - t3a[1]) /2),
+				t3a[2] + ((t3b[2] - t3a[2]) /2)
+			];
+			var dir = Math.atan2( lineCenter[0], lineCenter[1]);
+			var ofs = [Math.sin(dir) * o.explosionFrame*2,Math.cos(dir) * o.explosionFrame*2];
+			//var ofs = [100,100];
+			//var ofs = [1,2];
+			t3a[0] = lineCenter[0] + ofs[0] + (Math.sin(o.explosionFrame*deg*10 + dir)*(t3a[0] - lineCenter[0]));
+			t3a[1] = lineCenter[1] + ofs[1] + (Math.cos(o.explosionFrame*deg*10 + dir)*(t3a[1] - lineCenter[1]));
+			t3b[0] = lineCenter[0] + ofs[0] + (Math.sin(o.explosionFrame*deg*10 + dir)*(t3b[0] - lineCenter[0]));
+			t3b[1] = lineCenter[1] + ofs[1] + (Math.cos(o.explosionFrame*deg*10 + dir)*(t3b[1] - lineCenter[1]));
+			t3a[2] = t3a[2] + (o.explosionFrame*2);
+			t3b[2] = t3b[2] + (o.explosionFrame*2);
+			p3a = getP3Offset(getP3Offset(t3a, o.pos), camera);
+			p3b = getP3Offset(getP3Offset(t3b, o.pos), camera);
+		}
+
+
+		//if the depths of the first and second point in the line are not behind the camera...
+		//and the depths of the first and second point in the line are closer than the far plane...
+		if(p3a[2] < clipNear && p3b[2] < clipNear && p3a[2] > clipFar && p3b[2] > clipFar){
+
+			var p0 = project3Dto2D(p3a);
+			var p1 = project3Dto2D(p3b);
+			//                   min        max
+			var screenBounds = [[-cx, -cy],[cx, cy]];
+			var p0InBounds = pointInBounds([p0.x,p0.y],screenBounds);
+			var p1InBounds = pointInBounds([p1.x,p1.y],screenBounds);
+			//If the line is completely off screen, do not bother rendering it.
+			if(p0InBounds || p1InBounds){
+				c.beginPath();
+				c.moveTo(p0.x,p0.y);
+				c.lineTo(p1.x,p1.y);
+				c.strokeStyle= o.shape.lines[i][2] || o.shape.color || '#fff';
+				c.lineWidth=1;
+				c.lineCap='round';
+				c.stroke();
+			}
+		}
+	}
+}
+
+var drawLines = function(o){
+	//I see no reason to check whether the rotation/scale is different between processing each point,
+	//so I'll just do that once per frame and have a loop just for rotating the points.
+	if(o.lastRotString !== getP3String(o.rot) || o.lastScaleString !== getP3String(o.scale)){
+		//console.log(o.lastRotString);
+		for(var i = 0; i < o.shape.points.length; i += 1){
+			//to make sure I'm not messing with the original array...
+			var point = [o.shape.points[i][0],o.shape.points[i][1],o.shape.points[i][2]];
+			point = getP3Scaled(point, o.scale);
+			point = getP3Rotated(point, o.rot, o.rotOrder);
+			o.transformedPointCache[i] = point;
+		}
+		o.boundingBox = nGetBounds(o.transformedPointCache);
+		o.lastScaleString = getP3String(o.scale);
+		o.lastRotString = getP3String(o.rot);
+	}
+
+	var bbMinOffset = getP3Offset(getP3Offset(o.boundingBox[0], o.pos), camera);
+	var bbMaxOffset = getP3Offset(getP3Offset(o.boundingBox[1], o.pos), camera);
+
+	if(o.renderAlways){
+		lineRenderLoop(o);
+		return;
+	}
+
+	//Checking to see if any part of the bounding box is in front on the camera and closer than the far plane before bothering to do anything else...
+	if(bbMaxOffset[2] > clipFar && bbMinOffset[2] < clipNear && bbMaxOffset[2] > clipFar && bbMaxOffset[2] < clipNear){
+		//Alright. It's in front and not behind. Now is the bounding box even partially on screen?
+		//8 points determine the cube... let's start from the top left, spiraling down clockwise
+		var bbCube = [
+			[bbMinOffset[0],bbMinOffset[1],bbMaxOffset[2]],
+			[bbMaxOffset[0],bbMinOffset[1],bbMaxOffset[2]],
+			[bbMaxOffset[0],bbMaxOffset[1],bbMaxOffset[2]],
+			[bbMinOffset[0],bbMaxOffset[1],bbMaxOffset[2]],
+			[bbMinOffset[0],bbMinOffset[1],bbMinOffset[2]],
+			[bbMaxOffset[0],bbMinOffset[1],bbMinOffset[2]],
+			[bbMaxOffset[0],bbMaxOffset[1],bbMinOffset[2]],
+			[bbMinOffset[0],bbMaxOffset[1],bbMinOffset[2]],
+		];
+		var bbOffscreen = true;
+		//At some point in the future if I wanted to get really crazy, I could probably determine which order
+		//to sort the array above to orient the point closest to the center of the screen nearest the first of the list,
+		//so I don't bother checking all 8 points to determine if it's on screen - or even off screen.
+		for(var i = 0; i < bbCube.length && bbOffscreen; i += 1){
+			bbp = project3Dto2D(bbCube[i]);
+			if(bbp.x < cx && bbp.x > -cx && bbp.y < cy && bbp.y > -cy){
+				bbOffscreen = false;
+			}
+		}
+		if(!bbOffscreen){
+			lineRenderLoop(o);
+		}
+	}
+}
+
+//The only reason this isn't with the rest of the shapes is because I need to use it inside the prototype of ob3D
+var cubeShape = {
+	color:'#999',
+	points:[
+		[ 10, 10, 10],
+		[ 10, 10,-10],
+		[ 10,-10, 10],
+		[ 10,-10,-10],
+		[-10, 10, 10],
+		[-10, 10,-10],
+		[-10,-10, 10],
+		[-10,-10,-10]
+	],
+	lines:[
+		[0,1],
+		[2,3],
+		[4,5],
+		[6,7],
+		[3,1],
+		[2,0],
+		[7,5],
+		[6,4],
+		[5,1],
+		[7,3],
+		[4,0],
+		[6,2]
+	],
+};
+
+var destroy = function(){
+	if(this === window){throw 'JIM TYPE ERROR';}
+	for(var i = 0; i < rQ.length; i += 1){
+		if(rQ[i] === this){
+			rQ.splice(i,1);
+			//I FOUND THE BLINKING FOR REAL THIS TIME!!!
+			//console.log(cro,i);
+			//If the object being removed from the render queue is positioned earlier than
+			//the object that's currently being rendered, subtract 1 from the 'render state'
+			//to compensate for the object being taken out, so on cro +=1 in the global
+			//'update' loop, we don't skip a beat for that same render pass. Oh yeah!
+			if(i <= cro ){
+				cro -= 1;
+			}
+		}
+	}
+}
+
+var blessWith3DBase = function(o,config){
+	o.pos = config.pos || [0,0,0];
+	o.rot = config.rot ||[0,0,0];
+	o.rotOrder = config.rotOrder || [0,1,2];
+	o.scale = config.scale || [1,1,1];
+	o.lastScaleString = false;
+	o.lastRotString = false;
+	o.transformedPointCache = [];
+	o.boundingBox = [[0,0,0],[0,0,0]];
+	o.shape = config.shape || o.shape;
+	o.renderAlways = config.renderAlways || false;
+}
+
+var ob3D = function(config){
+	if(this === window){throw 'JIM TYPE ERROR';}
+	if(arguments.length > 1){throw 'ob3D expects only one param, an object with the named arguments.';}
+	var t = this;
+	blessWith3DBase(t,config);
+	return this;
+}
+
+ob3D.prototype = {
+	shape: cubeShape,
+	update:function(){
+		drawLines(this);
+	},
+	destroy:destroy
+};
+
+var blessWithActorBase = function(t,config){
+	t.isActor = true;
+	t.emitter = config.emitter || false;
+	t.health = config.health || 10;
+	t.damage = config.damage || 10;
+}
+
+var act3D = function(config){
+	if(this === window){throw 'JIM TYPE ERROR';}
+	if(arguments.length > 1){throw 'ob3D expects only one param, an object with the named arguments.';}
+	var t = this;
+	blessWith3DBase(t,config);
+	blessWithActorBase(t,config);
+	return t;
+}
+
+act3D.prototype = Object.create(ob3D.prototype);
+
+var dealDamage = function(t){
+	//Why check if this is an actor? Because if it's just exploded,
+	//I've just set isActor to false and I don't want to hit test anymore.
+	if(t.isActor === true){
+		var shiftedBoundingBox = [getP3Offset(t.boundingBox[0],t.pos),getP3Offset(t.boundingBox[1],t.pos)];
+		for(var i = 0; i < rQ.length; i += 1){
+			//lol, this was laughably bad -
+			//at first, I forgot to check if the located actor was itself or not,
+			//and the first time update was run, the ship was colliding with itself!
+			//a is for actor
+			var a = rQ[i];
+			var sharesParent = a.emitter && t.emitter && t.emitter !== a.emitter;
+			if(a.isActor === true && a !== t && a !== t.emitter && t !== a.emitter && !sharesParent){
+				if(pointInBounds(a.pos,shiftedBoundingBox)){
+					//console.log('COLLISSION!',a.name,'hit',t.name,a,t);
+					a.health -= t.damage;
+					t.health -= a.damage;
+					if(t.health <= 0){t.destroy();}
+					if(a.health <= 0){a.destroy();}
+				}
+			}
+		}
+	}
+}
+
+act3D.prototype.update = function(){
+	var t = this;
+	//Turns out you need to calculate the BB before you can hit test it.
+	drawLines(t);
+	dealDamage(t);
+};
+
+var rint = function(num){
+	return Math.round(((Math.random()*2)-1)*num);
+}
+
+//--------------------------------
+//Where da sprites at!
+//--------------------------------
+
+
+var drawSprite = function(o){
+	//offset the points by the object's position
+	var p3 = o.pos;
+	//TOTALLY A HACK TO GET SOME CAMERA MOVEMENT
+	var p3 = getP3Offset(p3, [camera[0],camera[1],camera[2]]);
+	if( p3[2] < clipNear && p3[2] > clipFar ){
+		var p2 = project3Dto2D(p3);
+		//Just some basic positional culling... if it's not on screen, don't render it...
+		if((p2.x + (o.offset.x * p2.scale) < cx && p2.x - (o.offset.x * p2.scale) > -cx) && (p2.y + (o.offset.y * p2.scale) < cy && p2.y - (o.offset.y * p2.scale) > -cy)){
+			c.save();
+			c.translate(p2.x,p2.y);
+			var scale = o.scale * p2.scale
+			c.scale(scale,scale);
+			c.rotate(o.rot);
+			if(o.numFrames > 1){
+				o.frameState += 0.3;
+				//console.log(o);
+				if(o.frameState >= o.numFrames){
+					o.frameState = 0;
+				}
+				c.drawImage(o.image, (o.width * Math.floor(o.frameState)), 0, o.width, o.height, o.offset.x, o.offset.y, o.width, o.height);
+			}else{
+				c.drawImage(o.image, o.offset.x, o.offset.y);
+			}
+			c.restore();
+		}
+	}
+}
+
+var blessWithSpriteBase = function(o,config){
+	if(!config.path){throw 'You MUST provide an image path value on sprite type objects!'};
+	o.pos = config.pos || [0,0,0];
+	o.rot = config.rot || 0;
+	o.scale = config.scale || 1;
+	o.numFrames = config.numFrames || 1;
+	o.frameState = o.numFrames;
+	o.width = 0;
+	o.height = 0;
+	o.image = new Image();
+	o.image.onload = function(){
+		o.width = o.image.width / o.numFrames;
+		o.height = o.image.height;
+		o.offset = {
+			x:-Math.round(o.width/2),
+			y:-Math.round(o.height/2)
+		};
+		o.boundingBox = [[o.offset.x,o.offset.y,-32],[-o.offset.x,-o.offset.y,32]];
+		rQ.push(o);
+		//console.log(t);
+	};
+	o.image.src = config.path;
+	return o;
+}
+
+var sprite2D3D = function(config){
+	if(this === window){throw 'JIM TYPE ERROR'};
+	var t = this;
+	blessWithSpriteBase(t,config);
+	return t;
+}
+
+sprite2D3D.prototype = {
+	update:function(){
+		drawSprite(this);
+	},
+	destroy:destroy
+};
+
+var act2D3D = function(config){
+	if(this === window){throw 'JIM TYPE ERROR'};
+	var t = this;
+	blessWithSpriteBase(t,config);
+	blessWithActorBase(t,config);
+	return t;
+}
+
+act2D3D.prototype = Object.create(sprite2D3D.prototype);
+act2D3D.update=function(){
+	drawSprite(this);
+	dealDamage(this);
+}
+
+//--------------------------------
+//Some basic animation tools
+//--------------------------------
+
+
+//THIS IS A REALLY, REALLY SLOW FUNCTION! PROBABLY BECAUSE OF ALL OF THE LOOPING AND CHECKING!
+var nGetOffsets = function(set0,set1,sub){
+	//console.log(arguments);
+	//The sub variable allows the function to work additively or subtractively.
+	if(sub === undefined || sub === false){sub = false;}else{sub = true;}
+	if(set0.length !== set1.length){throw 'Non-matching set lengths!';}
+	var typeError = 'All set values MUST be numbers! Problem encountered at: ';
+	var offsets = [];
+	for(var i = 0; i < set0.length; i += 1){
+		if(typeof set0[i] !== 'number'){throw typeError + 'set0 key '+i;}
+		if(typeof set1[i] !== 'number'){throw typeError + 'set1 key '+i;}
+		if(!sub){
+			offsets[i] = set1[i] + set0[i];
+		}else{
+			offsets[i] = set1[i] - set0[i];
+		}
+	}
+	return offsets;
+}
+
+//THIS IS -PROBABLY- A SLOW FUNCTION BECAUSE OF THE LOOPING, AND THE USE OF nGetOffsets
+var nTerpolate = function(set0, set1,totalSteps,state){
+	var offsets = nGetOffsets(set0,set1,true);
+	var result = [];
+	for(var i = 0; i < set0.length; i += 1){
+		result[i] = set0[i] + ((offsets[i] / totalSteps) * state);
+	}
+	return result;
+}
+
+
+//--------------------------------
+//Some basic boundary / collission testing maths. Still not entirely sure how the get2DInterset math works.
+//--------------------------------
+
+//I'm sure this function causes lag. I'm going to make 2D and 3D speciffic versions in a minute here.
+var pointInBounds = function (point,bounds){
+	//Works for 2D, 3D, and nD! Please, please feed in bounds generated like the line below.
+	//var bounds = nGetBounds(pointList);
+	//d stands for dimention
+	for(var d = 0; d < point.length; d += 1){
+		//dimentional value check
+		if(point[d] < bounds[0][d] || point[d] > bounds[1][d]){
+			return false;
+		}
+	}
+	return true;
+}
+
+// The following implementation HEAVILY influenced by the example2.c located at:
+// http://paulbourke.net/geometry/lineline2d/
+// Thanks for the help, Paul Bourke and Karl Kurbjun!
+// Please refer to the above URL for help understanding this.
+
+var get2DIntersect = function(firstLine,secondLine,pointList){
+
+	var line1 = {
+		p1:{
+			x:pointList[firstLine[0]][0],
+			y:pointList[firstLine[0]][1]
+		},
+		p2:{
+			x:pointList[firstLine[1]][0],
+			y:pointList[firstLine[1]][1]
+		},
+	};
+
+	var line2 = {
+		p1:{
+			x:pointList[secondLine[0]][0],
+			y:pointList[secondLine[0]][1]
+		},
+		p2:{
+			x:pointList[secondLine[1]][0],
+			y:pointList[secondLine[1]][1]
+		},
+	};
+
+	//The above is about the only bit I've written,
+	//and it only serves to get my data into the format used below.
+	//The rest I must attribute to Paul & Karl.
+
+	/* Denominator for ua and ub are the same so store this calculation */
+	var d = (line2.p2.y - line2.p1.y)*(line1.p2.x-line1.p1.x) -
+					(line2.p2.x - line2.p1.x)*(line1.p2.y-line1.p1.y);
+
+	/* n_a and n_b are calculated as seperate values for readability */
+	var n_a = (line2.p2.x - line2.p1.x)*(line1.p1.y-line2.p1.y) - 
+						(line2.p2.y - line2.p1.y)*(line1.p1.x-line2.p1.x);
+	var n_b = (line1.p2.x - line1.p1.x)*(line1.p1.y - line2.p1.y) -
+						(line1.p2.y - line1.p1.y)*(line1.p1.x - line2.p1.x);
+
+	/* Make sure there is not a division by zero - this also indicates that
+	 * the lines are parallel.
+	 *
+	 * If n_a and n_b were both equal to zero the lines would be on top of each 
+	 * other (coincidental).  This check is not done because it is not 
+	 * necessary for this implementation (the parallel check accounts for this).
+	 */
+	if(d === 0){return false;}
+
+	/* Calculate the intermediate fractional point that the lines potentially
+	 *  intersect.
+	 */
+	var ua = n_a / d;
+	var ub = n_b / d;
+
+	/* The fractional point will be between 0 and 1 inclusive if the lines
+	 * intersect.  If the fractional calculation is larger than 1 or smaller
+	 * than 0 the lines would need to be longer to intersect.
+	 */
+	display.innerHTML = 'd: '+d+'<br>ua: '+ua+'<br>ub: '+ub+'<br>';
+	if(ua >=0 && ua <= 1 && ub >= 0 && ub <= 1){
+		var x = line1.p1.x + (ua * (line1.p2.x - line1.p1.x));
+		var y = line1.p1.y + (ua * (line1.p2.y - line1.p1.y));
+		var result = [x,y];
+		drawCircle(result);
+		return result;
+	}
+	return false;
+}
+
+
+//--------------------------------
+//Some Meshes to play with!
+//--------------------------------
+//I wrote this one by hand...
+var shipShape = {
+	points:[
+		[20,0,0],
+		[0,20,0],
+		[-20,0,0],
+		[0,-20,0],
+		[40,0,0],
+		[10,0,10],
+		[0,10,10],
+		[-10,0,10],
+		[0,-10,10],
+		[0,40,0],
+		[-40,0,0],
+		[0,-40,0],
+		[0,0,-40]
+	],
+	lines:[
+		[12,4,'#f3c'],
+		[12,9,'#f3c'],
+		[12,10,'#f3c'],
+		[12,11,'#f3c'],
+		[9,4,'#93c'],
+		[10,9,'#93c'],
+		[11,10,'#93c'],
+		[4,11,'#93c'],
+
+		[5,0,'#06f'],
+		[6,1,'#06f'],
+		[7,2,'#06f'],
+		[8,3,'#06f'],
+		[0,1,'#03c'],
+		[1,2,'#03c'],
+		[2,3,'#03c'],
+		[3,0,'#03c'],
+		[5,6,'#09f'],
+		[6,7,'#09f'],
+		[7,8,'#09f'],
+		[8,5,'#09f'],
+		[0,4,'#f3c'],
+		[1,9,'#f3c'],
+		[2,10,'#f3c'],
+		[3,11,'#f3c']
+	]
+};
+var centerPointShape = {
+	color:'#0f0',
+	points:[
+		[10,-10,0],
+		[-10,10,0],
+		[10,10,0],
+		[-10,-10,0]
+	],
+	lines:[
+		[0,1],
+		[2,3]
+	]
+};
+//and I wrote another JS document to convert an OBJ file exported from Blender to generate this one.
+var shapes = {
+	altheartFrame:{"color":"#666","points":[[-20,-34,-14],[-20,-40,0],[-34,-34,0],[-40,-20,0],[-20,-34,14],[-6,-34,0],[0,-26,0],[40,-20,0],[34,-34,0],[20,-34,14],[6,-34,0],[20,-40,0],[20,-34,-14],[12,26,0],[-12,26,0],[0,32,0],[12,18,12],[22,18,0],[12,18,-12],[-22,18,0],[-12,18,12],[-12,18,-12],[0,-16,14],[0,-16,-14],[-20,-20,-20],[-20,-20,20],[20,-20,-20],[20,-20,20],[0,18,8],[0,18,-8]],"lines":[[0,24],[0,5],[0,1],[0,2],[0,2],[0,24],[0,5],[0,23],[0,23],[0,1],[1,5],[1,5],[1,4],[1,4],[1,2],[1,2],[2,4],[2,3],[2,4],[2,3],[3,25],[3,24],[4,5],[4,22],[4,22],[4,25],[4,5],[4,25],[5,6],[5,6],[6,23],[6,23],[6,10],[6,10],[6,22],[6,22],[7,27],[7,8],[7,26],[7,8],[8,12],[8,9],[8,11],[8,11],[8,12],[8,9],[9,11],[9,27],[9,10],[9,11],[9,27],[9,22],[9,10],[9,22],[10,12],[10,11],[10,12],[10,11],[11,12],[11,12],[12,23],[12,26],[12,23],[12,26],[13,16],[13,17],[13,16],[13,18],[13,17],[13,15],[13,18],[13,15],[14,15],[14,21],[14,20],[14,15],[14,20],[14,19],[14,19],[14,21],[15,28],[15,28],[15,16],[15,21],[15,16],[15,18],[15,29],[15,18],[15,20],[15,20],[15,21],[15,29],[16,28],[16,17],[17,18],[18,29],[19,21],[19,20],[20,28],[21,29],[22,25],[22,27],[23,24],[23,26]]},
+	altheartCore:{"color":"#e25","points":[[0,18,-8],[0,6,-12],[0,-6,-14],[0,-6,14],[0,6,12],[0,18,8],[20,-20,20],[20,-20,-20],[-20,-20,20],[-20,-20,-20],[0,-16,-14],[0,-16,14],[-12,18,-12],[-12,18,12],[-22,18,0],[12,18,-12],[22,18,0],[12,18,12],[32,6,0],[-32,6,0],[-18,6,16],[18,6,-16],[18,6,16],[-18,6,-16],[-38,-6,0],[-20,-6,18],[-20,-6,-18],[38,-6,0],[20,-6,18],[20,-6,-18],[40,-20,0],[-40,-20,0]],"lines":[[0,1],[0,1],[1,23],[1,2],[1,21],[1,2],[2,26],[2,29],[2,10],[2,10],[3,25],[3,4],[3,28],[3,4],[3,11],[3,11],[4,5],[4,5],[4,20],[4,22],[6,28],[6,28],[7,29],[7,29],[8,25],[8,25],[9,26],[9,26],[12,23],[12,23],[13,20],[13,20],[14,19],[14,19],[15,21],[15,21],[16,18],[16,18],[17,22],[17,22],[18,22],[18,27],[18,27],[18,21],[19,20],[19,24],[19,23],[19,24],[20,25],[20,25],[21,29],[21,29],[22,28],[22,28],[23,26],[23,26],[24,26],[24,25],[24,31],[24,31],[27,29],[27,28],[27,30],[27,30]]},
+	evilpumpkinBody:{"color":"#f90","points":[[48.30008,-12.548729999999999,51.73503],[55.77212,0,30],[48.300070000000005,12.548729999999999,8.26496],[12.5,-38.23557,52.92468],[24.15004,-48.77378,30.82049],[27.88606,-41.82909000000001,5.849959999999999],[24.15004,-23.67633,-12.64958],[12.5,0.73557,-14.575320000000001],[-12.5,-38.23557,52.92468],[-24.15004,-48.77378,30.82049],[-27.88606,-41.82909000000001,5.849959999999999],[-24.15004,-23.67632,-12.64958],[-12.5,0.73558,-14.575320000000001],[-25,-19.485570000000003,63.75],[-48.300070000000005,-12.54872,51.735040000000005],[-55.77212,0,30],[-48.300070000000005,12.548729999999999,8.26497],[-25,19.48558,-3.75],[0,14.349879999999999,5.14529],[-44.38494,22.19247,42.812830000000005],[-12.5,-0.73557,74.57531],[-24.15003,23.67633,72.64958],[-24.15004,48.77378,29.17951],[-12.5,38.23557,7.07531],[12.5,-0.73557,74.57531],[24.15004,23.67632,72.64958],[24.15004,48.77378,29.17951],[12.5,38.23557,7.07531],[25,-19.485570000000003,63.75],[25,19.485570000000003,-3.75],[2.9634500000000004,-9.62287,57.048449999999995],[-2.9634500000000004,-19.10651,53.11842],[44.38494,22.19247,42.812830000000005],[2.9634500000000004,-19.10651,53.11842],[-5.9269099999999995,-14.36469,55.08344],[-2.9634500000000004,-9.62287,57.048449999999995],[5.9269099999999995,-14.36469,55.08344]],"lines":[[0,1],[0,1],[0,28],[0,28],[1,32],[1,32],[1,5],[1,5],[1,2],[1,2],[2,29],[2,29],[3,4],[3,33],[3,33],[3,4],[4,5],[4,5],[5,10],[5,10],[5,6],[5,6],[6,7],[6,7],[7,18],[7,18],[8,31],[8,9],[8,9],[8,31],[9,10],[9,10],[10,15],[10,11],[10,11],[10,15],[11,12],[11,12],[12,18],[12,18],[13,34],[13,34],[13,14],[13,14],[14,15],[14,15],[15,19],[15,19],[15,16],[15,16],[16,17],[16,17],[17,18],[17,18],[18,23],[18,23],[18,27],[18,27],[18,29],[18,29],[20,35],[20,21],[20,21],[20,35],[22,23],[22,23],[24,25],[24,25],[24,30],[24,30],[26,27],[26,27],[28,36],[28,36]]},
+	evilpumpkinStem:{"color":"#090","points":[[5.9269099999999995,-14.36469,55.08344],[-2.9634500000000004,-9.62286,57.048449999999995],[-5.9269099999999995,-14.36469,55.08344],[2.9634500000000004,-19.10651,53.11842],[2.2725500000000003,-29.30986,66.74938],[-2.2725500000000003,-29.30986,66.74938],[-4.545100000000001,-26.69955,69.69553],[-2.2725500000000003,-24.08925,72.64166999999999],[2.2725500000000003,-24.08925,72.64166999999999],[4.545100000000001,-26.69955,69.69553],[2.9634500000000004,-12.986,68.33337],[-2.9634500000000004,-12.986,68.33337],[-5.9269099999999995,-17.35127,65.63326],[-2.9634500000000004,-21.716540000000002,62.93315],[2.9634500000000004,-21.716540000000002,62.93315],[5.9269099999999995,-17.35127,65.63326],[-2.9634500000000004,-19.10651,53.11842],[2.9634500000000004,-9.62286,57.048449999999995]],"lines":[[0,17],[0,15],[0,3],[0,15],[1,11],[1,2],[1,11],[1,17],[2,12],[2,16],[2,12],[3,14],[3,14],[3,16],[4,14],[4,14],[4,9],[4,5],[5,13],[5,6],[5,13],[6,12],[6,7],[6,12],[7,11],[7,8],[7,11],[8,10],[8,9],[8,10],[9,15],[9,15],[10,15],[10,17],[10,11],[10,15],[10,17],[10,11],[11,12],[11,12],[12,13],[12,13],[13,14],[13,16],[13,14],[13,16],[14,15],[14,15]]},
+	evilpumpkinEyes:{"color":"#f00","points":[[24.96639,36.09296,58.57365],[24.96639,42.79198,46.9706],[13.00902,45.14891,53.066680000000005],[13.00903,42.55078,57.566759999999995],[-13.00902,42.55078,57.566759999999995],[-13.00902,45.148900000000005,53.06667],[-24.96639,42.79198,46.9706],[-24.96639,36.09296,58.57365],[44.38494,22.19247,42.812830000000005],[0,48.87159,34.12178],[24.15004,48.77378,29.17951],[24.15004,23.67632,72.64957],[0,28.005360000000003,70.26315],[-24.15004,48.77378,29.17951],[-24.15003,23.67633,72.64957],[-44.38494,22.19247,42.812830000000005],[26.586080000000003,-0.65523,77.94418],[36.05594,16.3747,65.02430000000001],[15.52841,19.381,71.11575],[-36.05593,16.37469,65.02429000000001],[-15.5284,19.381,71.11574],[-26.58607,-0.65524,77.94417],[20.792609999999996,15.540579999999999,71.23857],[31.056379999999997,14.03743,68.19284999999999],[26.32144,5.52247,74.6528],[-26.32144,5.522460000000001,74.65279],[-20.7926,15.540579999999999,71.23857],[-31.05637,14.037420000000001,68.19284999999999]],"lines":[[0,11],[0,8],[0,8],[0,11],[1,10],[1,10],[1,8],[1,8],[2,10],[2,9],[2,10],[2,9],[3,11],[3,11],[3,12],[3,12],[4,14],[4,14],[4,12],[4,12],[5,9],[5,13],[5,13],[5,9],[6,15],[6,15],[6,13],[6,13],[7,15],[7,15],[7,14],[7,14],[16,17],[16,17],[16,18],[16,18],[17,18],[17,18],[19,20],[19,21],[19,20],[19,21],[20,21],[20,21],[22,23],[22,24],[23,24],[25,27],[25,26],[26,27]]},
+	heart:{"color":"#f0f","points":[[80,40,0],[0,100,0],[-80,40,0],[0,-50,0],[130,-60,0],[110,-100,0],[70,-110,0],[120,-10,0],[-120,-10,0],[-70,-110,0],[-110,-100,0],[-130,-60,0],[-130,-60,60],[-110,-100,60],[-70,-110,60],[-120,-10,60],[120,-10,60],[70,-110,60],[110,-100,60],[130,-60,60],[0,-50,60],[-80,40,60],[0,100,60],[80,40,60],[30,-90,0],[-30,-90,0],[-30,-90,60],[30,-90,60]],"lines":[[0,7],[0,23],[0,1],[0,23],[1,2],[1,22],[1,22],[2,21],[2,21],[2,8],[3,20],[3,25],[3,20],[3,24],[4,19],[4,5],[4,7],[4,19],[5,6],[5,18],[5,18],[6,17],[6,17],[6,24],[7,16],[7,16],[8,15],[8,15],[8,11],[9,25],[9,14],[9,14],[9,10],[10,13],[10,11],[10,13],[11,12],[11,12],[12,13],[12,15],[13,14],[14,26],[15,21],[16,19],[16,23],[17,27],[17,18],[18,19],[20,27],[20,26],[21,22],[22,23],[24,27],[24,27],[25,26],[25,26]]},
+	diamondInset:{"color":"#f09","points":[[0,-50,50],[0,0,0],[0,0,100],[50,0,50],[0,50,50],[-50,0,50],[10,-20,60],[10,-10,70],[20,-10,60],[-10,-20,60],[-20,-10,60],[-10,-10,70],[-10,-10,30],[-20,-10,40],[-10,-20,40],[10,-10,30],[20,-10,40],[10,-20,40],[10,10,30],[20,10,40],[10,20,40],[-10,10,30],[-20,10,40],[-10,20,40],[-10,10,70],[-10,20,60],[-20,10,60],[10,10,70],[10,20,60],[20,10,60]],"lines":[[0,1],[0,5],[0,5],[0,2],[0,2],[0,3],[0,3],[0,1],[1,5],[1,4],[1,4],[1,3],[1,3],[1,5],[2,4],[2,4],[2,5],[2,5],[2,3],[2,3],[3,4],[3,4],[4,5],[4,5],[6,8],[6,7],[7,8],[9,10],[9,11],[10,11],[12,14],[12,13],[13,14],[15,17],[15,16],[16,17],[18,19],[18,20],[19,20],[21,23],[21,22],[22,23],[24,25],[24,26],[25,26],[27,28],[27,29],[28,29]]},
+	diamondInside:{"color":"#90f","points":[[0,-50,50],[0,0,0],[0,0,100],[50,0,50],[0,50,50],[-50,0,50],[0,0,30],[-20,0,50],[0,-20,50],[0,0,70],[0,20,50],[20,0,50]],"lines":[[0,1],[0,5],[0,5],[0,2],[0,2],[0,3],[0,3],[0,1],[1,5],[1,4],[1,4],[1,3],[1,3],[1,5],[2,4],[2,4],[2,5],[2,5],[2,3],[2,3],[3,4],[3,4],[4,5],[4,5],[6,7],[6,11],[6,8],[6,10],[6,8],[6,7],[6,11],[6,10],[7,8],[7,10],[7,9],[7,9],[7,10],[7,8],[8,9],[8,9],[8,11],[8,11],[9,11],[9,10],[9,11],[9,10],[10,11],[10,11]]},
+	bullet:{"color":"#0ff","points":[[0,-10,0],[0,0,-20],[10,0,0],[0,10,0],[-10,0,0]],"lines":[[0,1],[0,1],[0,4],[0,2],[0,4],[0,2],[1,3],[1,2],[1,4],[1,2],[1,4],[1,3],[2,3],[2,3],[3,4],[3,4]]},
+	car:{"color":"#f00","points":[[-40,20,10],[-30,20,0],[-30,30,0],[-40,30,10],[-30,20,20],[-20,20,10],[-20,30,10],[-30,30,20],[30,30,20],[40,30,10],[40,20,10],[30,20,20],[20,30,10],[30,30,0],[30,20,0],[20,20,10],[20,-30,10],[30,-30,0],[30,-20,0],[20,-20,10],[30,-30,20],[40,-30,10],[40,-20,10],[30,-20,20],[-30,-20,20],[-20,-20,10],[-20,-30,10],[-30,-30,20],[-40,-20,10],[-30,-20,0],[-30,-30,0],[-40,-30,10],[-40,30,20],[-40,-30,20],[-30,-30,30],[-20,30,20],[-20,-30,20],[20,-30,20],[20,30,20],[30,30,30],[40,-30,20],[40,30,20],[60,20,20],[60,-20,20],[60,-20,30],[60,20,30],[50,30,30],[50,-30,30],[10,-10,60],[10,10,60],[-10,10,60],[-10,-10,60],[-50,-30,30],[-50,30,30],[-60,20,30],[-60,-20,30],[-60,-20,20],[-60,20,20],[30,-20,50],[30,20,50],[-30,-20,50],[-30,20,50],[30,-30,30],[-30,30,30],[-50,-30,20],[-50,30,20],[50,-30,20],[50,30,20]],"lines":[[0,1],[0,3],[0,4],[0,3],[0,1],[0,4],[1,5],[1,2],[1,5],[1,2],[2,6],[2,3],[2,6],[2,3],[3,7],[3,7],[4,7],[4,5],[4,5],[4,7],[5,6],[5,6],[6,7],[6,7],[8,9],[8,12],[8,11],[8,11],[8,9],[8,12],[9,10],[9,10],[9,13],[9,13],[10,14],[10,11],[10,11],[10,14],[11,15],[11,15],[12,13],[12,15],[12,13],[12,15],[13,14],[13,14],[14,15],[14,15],[16,20],[16,17],[16,19],[16,17],[16,19],[16,20],[17,21],[17,18],[17,21],[17,18],[18,22],[18,22],[18,19],[18,19],[19,23],[19,23],[20,23],[20,21],[20,23],[20,21],[21,22],[21,22],[22,23],[22,23],[24,27],[24,28],[24,27],[24,28],[24,25],[24,25],[25,26],[25,29],[25,26],[25,29],[26,27],[26,30],[26,27],[26,30],[27,31],[27,31],[28,29],[28,31],[28,31],[28,29],[29,30],[29,30],[30,31],[30,31],[32,63],[32,65],[32,65],[32,33],[32,63],[32,33],[33,64],[33,64],[33,34],[33,34],[34,63],[34,60],[34,63],[34,36],[34,62],[34,52],[34,52],[34,60],[34,62],[34,36],[35,38],[35,63],[35,38],[35,63],[35,36],[35,36],[36,37],[36,37],[37,38],[37,38],[37,62],[37,62],[38,39],[38,39],[39,62],[39,59],[39,62],[39,63],[39,46],[39,46],[39,41],[39,63],[39,59],[39,41],[40,41],[40,62],[40,66],[40,41],[40,62],[40,66],[41,67],[41,67],[42,43],[42,43],[42,67],[42,45],[42,67],[42,45],[43,66],[43,44],[43,66],[43,44],[44,47],[44,47],[44,45],[44,45],[45,46],[45,46],[46,67],[46,59],[46,47],[46,47],[46,67],[46,59],[47,62],[47,58],[47,62],[47,66],[47,58],[47,66],[48,58],[48,58],[48,49],[48,49],[48,51],[48,51],[49,59],[49,59],[49,50],[49,50],[50,51],[50,51],[50,61],[50,61],[51,60],[51,60],[52,55],[52,60],[52,60],[52,64],[52,53],[52,53],[52,64],[52,55],[53,61],[53,65],[53,54],[53,65],[53,54],[53,61],[53,63],[53,63],[54,57],[54,55],[54,57],[54,55],[55,56],[55,56],[56,57],[56,64],[56,57],[56,64],[57,65],[57,65],[58,62],[58,62],[58,60],[58,59],[58,59],[58,60],[59,61],[59,61],[60,61],[60,61],[61,63],[61,63],[64,65],[64,65],[66,67],[66,67]]},
+	treeRect:{"color":"#0a0","points":[[-20,-20,0],[20,-20,0],[20,20,0],[-20,20,0],[10,10,40],[-10,10,40],[10,-10,40],[-10,-10,40],[0,0,110],[-20,-20,90],[-20,20,90],[20,20,90],[20,-20,90],[-30,-30,70],[-30,30,70],[30,30,70],[30,-30,70],[-20,-20,40],[20,-20,40],[20,20,40],[-20,20,40]],"lines":[[0,7],[0,1],[0,7],[0,3],[0,1],[0,3],[1,6],[1,6],[1,2],[1,2],[2,4],[2,3],[2,4],[2,3],[3,5],[3,5],[4,19],[4,6],[4,19],[4,6],[4,5],[4,5],[5,20],[5,7],[5,20],[5,7],[6,7],[6,18],[6,7],[6,18],[7,17],[7,17],[8,10],[8,9],[8,10],[8,9],[8,12],[8,11],[8,11],[8,12],[9,12],[9,10],[9,13],[9,13],[9,12],[9,10],[10,14],[10,11],[10,11],[10,14],[11,15],[11,12],[11,15],[11,12],[12,16],[12,16],[13,17],[13,17],[13,14],[13,16],[13,14],[13,16],[14,20],[14,15],[14,15],[14,20],[15,19],[15,16],[15,19],[15,16],[16,18],[16,18],[17,20],[17,18],[17,18],[17,20],[18,19],[18,19],[19,20],[19,20]]},
+	treeDiag:{"color":"#6a0","points":[[0,-20,0],[20,0,0],[0,20,0],[-20,0,0],[0,-10,40],[10,0,40],[0,10,40],[-10,0,40],[-20,0,40],[0,20,40],[20,0,40],[0,-20,40],[0,0,110],[0,-30,90],[-30,0,90],[0,30,90],[30,0,90],[0,-40,70],[-40,0,70],[0,40,70],[40,0,70]],"lines":[[0,4],[0,1],[0,4],[0,3],[0,3],[0,1],[1,5],[1,2],[1,5],[1,2],[2,6],[2,6],[2,3],[2,3],[3,7],[3,7],[4,5],[4,7],[4,5],[4,11],[4,11],[4,7],[5,10],[5,6],[5,6],[5,10],[6,7],[6,9],[6,7],[6,9],[7,8],[7,8],[8,9],[8,9],[8,11],[8,11],[8,18],[8,18],[9,19],[9,10],[9,19],[9,10],[10,20],[10,11],[10,11],[10,20],[11,17],[11,17],[12,13],[12,16],[12,15],[12,14],[12,15],[12,14],[12,13],[12,16],[13,14],[13,16],[13,17],[13,17],[13,16],[13,14],[14,15],[14,18],[14,15],[14,18],[15,16],[15,19],[15,19],[15,16],[16,20],[16,20],[17,20],[17,18],[17,20],[17,18],[18,19],[18,19],[19,20],[19,20]]},
+	lightcycle:{"color":"#f67","points":[[2.01723,-12.484599999999999,1.9442599999999999],[2.03062,-12.498199999999999,4.42113],[3.36892,-12.493,3.2959500000000004],[-2.0219300000000002,-12.4848,1.9445599999999998],[-3.37361,-12.4932,3.29625],[-2.03532,-12.4984,4.42143],[1.8323800000000001,4.26631,1.04828],[2.92475,4.26631,-0.051609999999999996],[1.8308499999999999,2.14867,-1.03751],[2.92475,4.26631,-1.79284],[1.8323800000000001,4.26631,-3.00112],[-2.9244399999999997,4.26657,-1.79256],[-1.84448,2.15135,-1.04851],[-1.83207,4.26657,-3.00084],[-2.9244399999999997,4.26657,-0.05133],[-1.83207,4.26657,1.0485600000000002],[2.10804,0.52268,-0.5805400000000001],[1.84524,0.47402,-0.312],[1.83956,0.82745,-0.44486],[1.84414,0.58626,-0.79924],[-2.09457,0.52223,-0.5805400000000001],[-1.82314,0.82963,-0.44552],[-1.8317700000000001,0.47357000000000005,-0.312],[-1.83067,0.58581,-0.79924],[2.51749,-4.69307,-2.85684],[2.51749,-5.2617899999999995,-2.85684],[2.51749,-5.2617899999999995,-2.5285],[2.51749,-4.69307,-2.5285],[-2.51749,-4.69339,-2.5264599999999997],[-2.51749,-5.26211,-2.5264599999999997],[-2.51749,-4.69339,-2.8548099999999996],[-2.51749,-5.26211,-2.8548099999999996],[2.03185,-12.498000000000001,4.88381],[-2.03342,-12.498000000000001,4.88381],[-0.00722,-12.498000000000001,6.82489],[-3.1767600000000003,-2.86429,-1.77701],[-1.82509,-2.8559400000000004,-0.42533],[-1.8384800000000001,-2.8695199999999996,-2.90219],[1.85195,-2.8690700000000002,-2.90219],[1.83856,-2.85549,-0.42533],[3.19023,-2.86384,-1.77701],[1.11677,-12.5237,3.1315500000000003],[1.11677,-10.5458,2.60154],[0.75052,-11.8757,0.29799],[0.75052,-12.5237,0.47163],[1.11677,-9.0978,-2.80234],[0.75052,-11.4013,-1.47238],[1.59198,-12.4176,-0.64059],[1.59198,-12.5237,-0.61216],[1.59198,-12.3399,-0.93049],[1.59198,-12.5237,-1.0366],[1.59198,-12.7075,-0.93049],[1.59198,-12.7075,-0.71827],[0.75052,-12.5237,-2.12039],[0.75052,-13.6461,-1.47239],[0.75052,-13.6461,-0.17637],[1.11677,-12.5237,-4.78029],[1.11677,-15.9496,-2.80234],[1.11677,-15.9496,1.15358],[0.49112,-12.5237,-6.35937],[0.49112,-17.3172,-3.59188],[0.49112,-17.3172,1.9431200000000002],[-0.49112,-12.5237,-6.35937],[-0.49112,-17.3172,-3.59188],[-0.49112,-17.3172,1.9431200000000002],[-1.11677,-12.5237,-4.78029],[-1.11677,-15.9496,-2.80234],[-1.11677,-15.9496,1.15358],[-0.75052,-12.5237,-2.12039],[-0.75052,-13.6461,-1.47239],[-0.75052,-13.6461,-0.17637],[-1.59199,-12.5237,-1.0366],[-1.59199,-12.7075,-0.93049],[-1.59199,-12.7075,-0.71827],[-1.59199,-12.5237,-0.61216],[-1.59199,-12.4176,-0.64059],[-1.59199,-12.3399,-0.93049],[-0.75052,-11.8757,0.29799],[-0.75052,-12.5237,0.47163],[-0.75052,-11.4013,-1.47238],[-1.11677,-12.5237,3.1315500000000003],[-1.11677,-10.5458,2.60154],[-1.11677,-9.0978,-2.80234],[-4.67964,1.96861,4.3320799999999995],[-1.61836,1.96861,4.3320799999999995],[-1.61836,12.9343,4.3320799999999995],[-3.78301,8.51775,4.3320799999999995],[-3.78301,1.51695,6.41991],[-1.61836,1.31993,7.369409999999999],[-3.149,8.51775,5.74851],[-1.61836,8.51775,6.41991],[2.51576,-5.2243200000000005,2.9392899999999997],[-2.51576,-5.2243200000000005,2.9412899999999995],[-2.51666,-8.89701,5.363289999999999],[2.48635,-8.90001,5.363289999999999],[2.49084,0.20766,7.89393],[-2.5170700000000004,0.20084000000000002,7.89401],[2.032,-5.49832,-4.74586],[-2.032,-5.49832,-4.74586],[-2.032,-12.502899999999999,-4.76829],[2.032,-12.5119,-4.76829],[2.03467,-12.5033,-3.2470700000000003],[2.032,-11.3564,-2.86761],[2.032,-10.462299999999999,-2.01215],[2.032,-4.11132,2.3252900000000003],[-2.02933,-12.504299999999999,-3.2460699999999996],[-2.032,-11.3534,-2.8655999999999997],[-2.032,-10.462299999999999,-2.01416],[-2.032,-4.11132,2.3252900000000003],[2.032,-10.419,0.35192],[2.032,-12.4983,5.09266],[2.032,-6.461320000000001,5.09266],[2.032,-10.1603,-0.87148],[-2.032,-10.1599,-0.8380700000000001],[-2.032,-10.419,0.35192],[-2.032,-12.4983,5.09266],[-2.032,-6.461320000000001,5.09266],[2.8983,-10.3941,2.57859],[2.02532,-10.608900000000002,1.7413100000000001],[2.2867100000000002,-9.10647,2.09947],[2.02391,-9.15513,1.83092],[2.0228099999999998,-9.04289,2.31817],[2.0258000000000003,-8.82157,1.9308800000000002],[2.03124,-10.2142,3.26579],[-2.03002,-10.609200000000001,1.7416],[-2.903,-10.3944,2.57889],[-2.03594,-10.2144,3.26608],[-2.29141,-9.1067,2.09977],[-2.02751,-9.04312,2.31847],[-2.02861,-9.15536,1.83122],[-2.02138,-8.82272,1.92987],[4.01713,8.83574,0.81901],[3.7244300000000004,6.90368,0.58573],[1.8323800000000001,6.90368,2.5304599999999997],[1.8323800000000001,8.83573,3.0729800000000003],[4.01713,8.83574,-2.66346],[3.7244300000000004,6.90368,-2.43018],[1.8323800000000001,6.90368,-4.4833],[1.8323800000000001,8.83574,-5.02583],[-4.01682,8.83599,0.8193],[-3.72412,6.90395,0.58602],[-3.72412,6.90395,-2.4299],[-4.01682,8.83599,-2.66318],[-1.83207,6.90395,-4.48302],[-1.83207,8.83599,-5.0255399999999995],[-1.83207,6.9039399999999995,2.53075],[-1.83207,8.83599,3.07326],[-0.007730000000000001,-9.972800000000001,5.75743],[1.08502,-10.1219,4.88381],[-1.1004800000000001,-10.1219,4.88381],[2.71962,-0.765,-1.05966],[1.84665,-0.97978,-0.22237],[1.85257,-0.58506,-1.7468400000000002],[-2.70615,-0.76545,-1.05966],[-1.83318,-0.9802299999999999,-0.22237],[-1.8391,-0.58552,-1.7468400000000002],[-0.49112,-12.5237,4.71063],[0.49112,-12.5237,4.71063],[2.51576,-3.28432,0.65429],[-2.51576,-3.28532,0.6532899999999999],[-2.51576,-4.538320000000001,-1.6747100000000001],[2.51576,-4.5403199999999995,-1.67571],[2.51576,8.323,0.6575799999999999],[-2.51576,8.32501,0.6575799999999999],[-2.51576,10.1406,2.9485],[2.51576,10.1416,2.9495],[2.48635,8.43192,7.26024],[-2.51666,8.43192,7.26024],[2.51576,-5.25332,-1.44471],[-2.51576,-5.25432,-1.44571],[2.48635,16.1712,4.1123199999999995],[-2.51666,16.1712,4.1123199999999995],[2.032,10.7467,5.86129],[2.032,10.7467,-4.74586],[2.032,8.72868,-4.74586],[2.032,8.72868,5.86129],[2.032,-4.11132,2.3252900000000003],[2.032,-5.49832,-4.74586],[-2.032,10.7467,-4.74586],[-2.023,10.7467,5.86129],[-2.032,8.72868,5.86129],[-2.032,8.72868,-4.74586],[-2.032,-4.11132,2.3252900000000003],[-2.032,-5.49832,-4.74586],[-2.032,-11.3222,1.28],[-2.032,-12.4983,1.62765],[2.032,-11.3222,1.28],[2.032,-12.4983,1.62765],[1.45645,17.2092,4.3099300000000005],[1.45857,15.9026,4.06383],[1.45857,11.597299999999999,5.68231],[1.45645,12.2298,6.97395],[-1.4530399999999999,17.2163,4.29786],[-1.45091,15.9024,4.06394],[-1.4530399999999999,12.236899999999999,6.96187],[-1.45091,11.6043,5.6701500000000005],[-1.4530399999999999,1.32865,8.6659],[-1.4530399999999999,-11.024099999999999,5.20378],[-1.45091,-10.3127,4.013780000000001],[-1.45091,1.32917,7.3177],[1.45645,1.32155,8.67798],[1.45857,1.32217,7.33047],[1.45857,-10.3196,4.02593],[1.45645,-11.031200000000002,5.21586],[4,13.157700000000002,-4.89907],[4,16.686799999999998,-2.86157],[1.404,17.9512,-3.59157],[1.404,13.157700000000002,-6.35907],[2.9659999999999997,13.157700000000002,-4.55607],[2.9659999999999997,16.3897,-2.69007],[4,9.62859,-2.86157],[2.9659999999999997,9.92569,-2.69007],[1.404,8.364230000000001,-3.59157],[4,9.62859,1.2134200000000002],[2.9659999999999997,9.92569,1.0419200000000002],[1.404,8.4481,1.87191],[1.404,13.157700000000002,4.710929999999999],[4,13.157700000000002,3.2509300000000003],[2.9659999999999997,13.157700000000002,2.9079300000000003],[1.404,17.9512,1.94342],[4,16.686799999999998,1.2134200000000002],[2.9659999999999997,16.3897,1.0419200000000002],[-3.39729,13.157700000000002,-0.61186],[-2.12235,13.157700000000002,0.47192],[-2.12235,12.0353,-0.17608],[-3.39729,12.9739,-0.71797],[-3.39729,13.3415,-0.71797],[-2.12235,14.280100000000001,-0.17608],[-3.39729,13.0516,-1.00786],[-3.39729,13.3415,-0.9301900000000001],[-3.39729,13.157700000000002,-1.03629],[-2.12235,14.280100000000001,-1.47207],[-2.12235,13.157700000000002,-2.12007],[-2.12235,12.1505,-1.62948],[-2.9659999999999997,13.157700000000002,2.9079300000000003],[-2.9659999999999997,9.92569,1.0419200000000002],[-2.9659999999999997,16.3897,1.0419200000000002],[-2.9659999999999997,16.3897,-2.69007],[-2.9659999999999997,13.157700000000002,-4.55607],[-2.9659999999999997,9.92569,-2.69007],[-4,13.157700000000002,3.2509300000000003],[-4,9.62859,1.2134200000000002],[-4,16.686799999999998,1.2134200000000002],[-4,16.686799999999998,-2.86157],[-4,13.157700000000002,-4.89907],[-4,9.62859,-2.86157],[-1.404,13.157700000000002,4.710929999999999],[-1.404,8.4481,1.87191],[-1.404,17.9512,1.94342],[-1.404,17.9512,-3.59157],[-1.404,13.157700000000002,-6.35907],[-1.404,8.364230000000001,-3.59157],[2.12235,14.280100000000001,-1.47207],[2.12235,14.280100000000001,-0.17608],[2.12235,13.157700000000002,-2.12007],[3.39729,13.3415,-0.9301900000000001],[3.39729,13.3415,-0.71797],[3.39729,13.157700000000002,-1.03629],[2.12235,13.157700000000002,0.47192],[2.12235,12.0353,-0.17608],[2.12235,12.1505,-1.62948],[3.39729,13.157700000000002,-0.61186],[3.39729,12.9739,-0.71797],[3.39729,13.0516,-1.00786],[-0.49112,-7.73027,-3.5918699999999997],[0.49112,-7.73027,-3.5918699999999997],[4.67111,1.96861,4.32949],[1.6098299999999999,1.96861,4.32949],[1.6098299999999999,1.31993,7.36683],[3.77448,1.51695,6.41734],[3.14047,8.51775,5.745940000000001],[3.77448,8.51775,4.32949],[1.6098299999999999,8.51775,6.41734],[1.6098299999999999,12.9343,4.32949],[null,10,0],[null,0,0],[null,0,10],[null,10,10]],"lines":[[0,2],[0,118],[1,123],[1,2],[2,117],[2,117],[3,4],[3,124],[4,125],[4,5],[4,125],[5,126],[6,7],[6,133],[7,132],[7,9],[7,132],[9,10],[9,136],[9,136],[10,137],[11,13],[11,141],[11,14],[11,141],[13,143],[14,15],[14,140],[14,140],[15,145],[16,19],[16,150],[16,150],[16,17],[17,151],[19,152],[20,153],[20,22],[20,23],[20,153],[22,154],[23,155],[24,27],[24,30],[24,25],[24,30],[25,26],[25,31],[25,31],[26,29],[26,29],[26,27],[27,28],[27,28],[28,30],[28,29],[29,31],[30,31],[32,34],[32,148],[33,149],[33,34],[34,147],[34,147],[35,36],[35,153],[35,37],[35,153],[36,154],[37,155],[38,152],[38,40],[39,151],[39,40],[40,150],[40,150],[41,44],[41,58],[41,157],[41,58],[41,44],[41,42],[42,45],[42,43],[42,43],[43,46],[43,47],[43,44],[43,44],[43,46],[43,47],[44,48],[44,48],[44,55],[44,55],[45,56],[45,46],[45,265],[45,56],[45,46],[46,53],[46,49],[46,49],[46,53],[47,48],[47,49],[47,51],[47,48],[47,49],[47,51],[48,52],[48,52],[49,50],[49,50],[50,53],[50,51],[50,51],[50,53],[51,52],[51,52],[51,54],[51,54],[52,55],[52,55],[53,56],[53,54],[53,54],[53,56],[54,57],[54,55],[54,57],[54,55],[55,58],[55,58],[56,59],[56,57],[56,57],[56,59],[57,60],[57,58],[57,60],[57,58],[58,61],[58,61],[59,265],[59,265],[59,62],[59,60],[59,60],[59,62],[60,63],[60,61],[60,63],[60,61],[61,64],[61,157],[61,64],[61,157],[62,63],[62,264],[62,264],[62,65],[62,63],[62,65],[63,66],[63,64],[63,66],[63,64],[64,156],[64,67],[64,67],[64,156],[65,68],[65,66],[65,82],[65,66],[65,82],[65,68],[66,67],[66,69],[66,69],[66,67],[67,80],[67,70],[67,80],[67,70],[68,71],[68,79],[68,71],[68,69],[68,69],[68,79],[69,72],[69,70],[69,70],[69,72],[70,73],[70,73],[70,78],[70,78],[71,72],[71,76],[71,72],[71,76],[72,75],[72,75],[72,73],[72,73],[73,74],[73,74],[74,78],[74,75],[74,75],[74,78],[75,76],[75,77],[75,76],[75,77],[76,79],[76,79],[77,79],[77,78],[77,78],[77,81],[77,79],[77,81],[78,80],[78,80],[79,82],[79,82],[80,81],[80,156],[81,82],[82,264],[83,87],[83,84],[83,86],[83,84],[83,87],[83,86],[84,88],[84,85],[84,85],[84,88],[85,90],[85,86],[85,86],[85,90],[86,89],[86,89],[87,88],[87,88],[87,89],[87,89],[88,90],[88,90],[89,90],[89,90],[91,92],[91,166],[91,92],[91,165],[91,92],[91,158],[91,94],[91,158],[91,168],[91,166],[91,165],[91,166],[91,165],[91,158],[91,92],[91,168],[91,92],[91,94],[92,159],[92,159],[92,93],[92,167],[92,164],[92,169],[92,93],[92,159],[92,164],[92,164],[92,167],[92,169],[92,167],[93,96],[93,94],[93,96],[93,94],[94,95],[94,95],[95,166],[95,96],[95,166],[95,96],[96,167],[96,167],[97,104],[97,100],[97,98],[97,102],[97,100],[97,102],[98,106],[98,99],[98,99],[98,106],[98,108],[99,100],[99,105],[99,100],[99,105],[100,101],[100,101],[101,102],[101,105],[101,102],[101,105],[102,106],[102,103],[102,103],[102,106],[103,104],[103,112],[103,112],[103,104],[103,107],[103,107],[104,111],[105,106],[105,106],[106,107],[106,107],[107,108],[107,108],[107,113],[107,113],[108,116],[109,112],[109,112],[109,114],[109,114],[109,186],[109,110],[109,186],[109,110],[110,187],[110,111],[110,115],[110,115],[110,187],[110,111],[111,116],[111,112],[111,112],[112,113],[112,113],[113,114],[113,116],[113,114],[113,116],[114,184],[114,184],[114,115],[114,115],[115,116],[115,185],[115,185],[115,116],[117,123],[117,123],[117,118],[117,119],[117,118],[117,119],[118,120],[119,121],[119,121],[119,120],[119,120],[120,122],[121,122],[121,123],[124,129],[124,125],[124,125],[125,126],[125,126],[125,127],[125,127],[126,128],[127,128],[127,128],[127,129],[127,129],[128,130],[129,130],[131,132],[131,135],[131,135],[131,134],[131,134],[131,132],[132,136],[132,133],[132,136],[132,133],[133,134],[134,138],[135,138],[135,136],[135,136],[135,138],[136,137],[136,137],[137,138],[139,142],[139,140],[139,140],[139,146],[139,146],[139,142],[140,145],[140,141],[140,141],[140,145],[141,143],[141,143],[141,142],[141,142],[142,144],[142,144],[143,144],[144,146],[145,146],[147,148],[147,149],[150,151],[150,152],[150,151],[150,152],[153,155],[153,154],[153,155],[153,154],[156,157],[158,161],[158,159],[158,161],[158,162],[158,159],[158,159],[158,162],[159,163],[159,160],[159,160],[159,163],[160,169],[160,161],[160,169],[160,161],[161,168],[161,168],[162,165],[162,163],[162,163],[162,165],[163,164],[163,164],[164,165],[164,165],[164,171],[164,165],[164,171],[165,170],[165,170],[166,167],[166,167],[166,170],[166,170],[166,167],[167,171],[167,171],[168,169],[168,169],[170,171],[170,171],[172,173],[172,175],[173,178],[173,174],[173,174],[174,177],[174,175],[174,175],[174,177],[174,181],[174,181],[175,176],[176,177],[177,183],[178,181],[178,181],[178,179],[179,180],[180,182],[180,181],[180,181],[181,183],[181,183],[182,183],[184,186],[184,185],[184,185],[184,186],[185,187],[185,187],[186,187],[186,187],[188,189],[188,191],[188,192],[188,192],[188,189],[188,191],[189,193],[189,190],[190,201],[190,191],[190,191],[191,200],[191,194],[191,194],[191,200],[192,193],[192,194],[192,193],[192,194],[193,195],[194,196],[194,196],[194,195],[194,195],[195,199],[196,200],[196,197],[196,199],[196,197],[196,199],[196,200],[197,203],[197,198],[197,203],[197,198],[198,199],[198,202],[200,203],[200,201],[200,203],[200,201],[201,202],[202,203],[202,203],[204,210],[204,205],[204,208],[204,207],[204,207],[204,205],[204,208],[204,210],[205,209],[205,206],[205,220],[205,206],[205,220],[205,209],[206,207],[206,219],[206,207],[206,249],[206,249],[206,219],[207,212],[207,250],[207,212],[207,250],[208,209],[208,254],[208,211],[208,209],[208,254],[208,211],[209,252],[209,252],[209,221],[209,221],[210,212],[210,211],[210,213],[210,211],[210,213],[210,212],[211,260],[211,214],[211,260],[211,214],[212,215],[212,251],[212,215],[212,251],[213,214],[213,217],[213,214],[213,217],[213,215],[213,215],[214,218],[214,259],[214,218],[214,259],[215,247],[215,216],[215,216],[215,247],[216,246],[216,246],[216,219],[216,219],[216,217],[216,217],[217,218],[217,218],[217,220],[217,220],[218,221],[218,258],[218,221],[218,258],[219,220],[219,220],[219,248],[219,248],[220,221],[220,221],[221,253],[221,253],[222,223],[222,226],[222,225],[222,225],[222,226],[222,223],[223,224],[223,224],[223,227],[223,234],[223,227],[223,234],[224,225],[224,233],[224,235],[224,235],[224,225],[224,233],[225,228],[225,228],[226,229],[226,228],[226,228],[226,227],[226,229],[226,227],[227,231],[227,231],[227,236],[227,236],[228,230],[228,233],[228,230],[228,233],[229,231],[229,230],[229,231],[229,230],[230,232],[230,232],[231,237],[231,232],[231,237],[231,232],[232,238],[232,238],[232,233],[232,233],[233,239],[233,239],[234,236],[234,235],[234,240],[234,236],[234,240],[234,235],[235,241],[235,239],[235,241],[235,239],[236,237],[236,242],[236,242],[236,237],[237,243],[237,238],[237,243],[237,238],[238,244],[238,244],[238,239],[238,239],[239,245],[239,245],[240,242],[240,246],[240,241],[240,246],[240,241],[240,242],[241,245],[241,245],[241,247],[241,247],[242,243],[242,243],[242,248],[242,248],[243,249],[243,244],[243,249],[243,244],[244,250],[244,245],[244,245],[244,250],[245,251],[245,251],[246,247],[246,247],[246,248],[246,248],[247,251],[247,251],[248,249],[248,249],[249,250],[249,250],[250,251],[250,251],[252,254],[252,255],[252,254],[252,253],[252,253],[252,255],[253,256],[253,258],[253,258],[253,256],[254,257],[254,260],[254,257],[254,260],[255,256],[255,256],[255,257],[255,257],[256,261],[256,261],[256,263],[256,263],[257,263],[257,263],[258,259],[258,259],[258,261],[258,261],[259,262],[259,262],[259,260],[259,260],[260,263],[260,263],[261,262],[261,262],[262,263],[262,263],[264,265],[266,269],[266,271],[266,271],[266,269],[266,267],[266,267],[267,268],[267,273],[267,268],[267,273],[268,269],[268,272],[268,272],[268,269],[269,270],[269,270],[270,271],[270,272],[270,271],[270,272],[271,273],[271,273],[272,273],[272,273]]}
+};
+
+//So I previously had a rather simple plane in the shape above, but it was about a zillion b a zillion. Result? a 300K file. I'ma use a loop below and make it dynamically in 300 bytes.
+
+var planeGeom = {color:'#666',points:[],lines:[]};
+var planeX = 50;
+var planeY = 50;
+var pxh = planeX / 2;
+var pyh = planeX / 2;
+for(var x = 0; x < planeX; x += 1){
+	for(var y = 0; y < planeY; y += 1){
+		var p1Num = planeGeom.points.length;
+		var p2Num = p1Num + 1;
+		var point1 = [(x * 100) - (pxh * 100) + 50, (y * 100) - (pyh * 100) + 50, 0];
+		planeGeom.points[p1Num] = point1;
+		planeGeom.points[p2Num] = [point1[0],point1[1],10];
+		planeGeom.lines[planeGeom.lines.length] = [p1Num,p2Num];
+	}
+}
+
+//--------------------------------
+//Scene setup! This is where I use all of the above!
+//--------------------------------
+
+var mySprite = new act2D3D({
+	pos:[128,256,-2],
+	path:'sprites/megaman_heart_sprite_2x.png',
+	numFrames:4,
+});
+for(var i = 0; i < 10; i += 1){
+	new sprite2D3D({
+		pos:[rint(1000),rint(1000),-1],
+		path:'nyan-sprite.png'
+	});
+	var actSprite = new act2D3D({
+		pos:[rint(1000),rint(1000),-1],
+		path:'sprites/megaman_heart_sprite_2x.png',
+		scale:2,
+		numFrames:4,
+		health:10,
+		damage:-10,
+});
+}
+
+//--------------------------------
+//A ship that I can control
+//--------------------------------
+var displayStatus = document.getElementById('displayStatus');
+var ship = new act3D({
+	scale:[4,4,4],
+	rotOrder:[2,1,0],
+	shape:shapes.lightcycle
+});
+ship.name = 'Your Ship';
+ship.health = 100;
+ship.speed = 3;
+ship.vel = [0,0];
+ship.drag = 0.9;
+ship.shapeList = [
+	shipShape,
+	shapes.diamondInside,
+	shapes.diamondInset,
+];
+ship.shapeState = 0;
+ship.update = function(){
+	var t = this;
+
+	if(kb.left){t.vel[0]-=t.speed;}
+	if(kb.right){t.vel[0]+=t.speed;}
+	if(kb.up){t.vel[1]-=t.speed;}
+	if(kb.down){t.vel[1]+=t.speed;}
+	if(kb.space){addBullet([t.pos[0],t.pos[1],t.pos[2]],t); kb.space = false;}
+	if(kb.one){
+		kb.one = false;
+		var newTarget = new act3D({
+			pos:[t.pos[0],t.pos[1],t.pos[2]],
+			emitter:t,
+			shape:shapes.treeRect
+		});
+		rQ.push(newTarget);
+	}
+	if(kb.two){
+		kb.two = false;
+		var newTarget = new act3D({
+			pos:[t.pos[0],t.pos[1],t.pos[2]],
+			emitter:t,
+			shape:shapes.treeDiag
+		});
+		rQ.push(newTarget);
+	}
+	if(kb.three){
+		kb.three = false;
+		var newTarget = new act3D({
+			pos:[t.pos[0],t.pos[1],t.pos[2]],
+			emitter:t,
+			shape:shapes.car
+		});
+		rQ.push(newTarget);
+	}
+	if(kb.four){
+		t.shapeState += 1;
+		if(t.shapeState >= t.shapeList.length){t.shapeState = 0;}
+		t.shape = t.shapeList[t.shapeState];
+		kb.four = false;
+	}
+
+	if(Math.abs(t.vel[0]) > 0.0001 || Math.abs(t.vel[1]) > 0.0001){
+		t.pos[0] += t.vel[0];
+		t.pos[1] += t.vel[1];
+		t.vel[0] *= t.drag;
+		t.vel[1] *= t.drag;
+/*
+		t.rot = Math.atan2(t.vel[0],t.vel[1]);
+		if(t.pos[0] > cx + 16){t.pos[0] = -cx -16;}
+		if(t.pos[0] < -cx -16){t.pos[0] = cx + 16;}
+		if(t.pos[1] > cy + 16){t.pos[1] = -cy -16;}
+		if(t.pos[1] < -cy -16){t.pos[1] = cy + 16;}
+*/
+	}
+	//t.rot[2] += tau/36;
+	t.rot[1] = Math.atan2(t.vel[0] * 0.06, -t.vel[1] * 0.06);
+	t.rot[0] = tau/4;
+	t.rot[2] = tau/4;
+	
+	displayStatus.innerHTML = 'Ship health: '+t.health;
+	drawLines(t);
+	dealDamage(t);
+};
+
+rQ.push(ship);
+
+var makeEnemy = function(pos){
+	if(pos.length < 3){throw 'PROBLEM! You need to give 3 keys for the pos array!';}
+	var initPos = [pos[0],pos[1],pos[2]];
+	var scale = Math.random() + 0.2;
+	var evilPumpkin = new act3D({
+		pos:initPos,
+		shape:shapes.evilpumpkinBody,
+		scale:[scale,scale,scale]
+	});
+	evilPumpkin.name = 'EVILPUMPKIN!!!';
+	var evilPumpkinEyes = new ob3D({shape:shapes.evilpumpkinEyes});
+	var evilPumpkinStem = new ob3D({shape:shapes.evilpumpkinStem});
+	evilPumpkinEyes.scale = evilPumpkin.scale;
+	evilPumpkinStem.scale = evilPumpkin.scale;
+	evilPumpkinEyes.pos = evilPumpkin.pos;
+	evilPumpkinStem.pos = evilPumpkin.pos;
+	evilPumpkinEyes.rot = evilPumpkin.rot;
+	evilPumpkinStem.rot = evilPumpkin.rot;
+	evilPumpkin.actuallyDestroy = evilPumpkin.destroy;
+	evilPumpkin.update = function(){
+		if(this.explosionFrame !== undefined){
+			this.explosionFrame += 1;
+		}
+		if(this.explosionFrame > 50){
+			this.actuallyDestroy();
+		}
+		
+		evilPumpkinEyes.explosionFrame = this.explosionFrame;
+		evilPumpkinStem.explosionFrame = this.explosionFrame;
+		evilPumpkinEyes.update();
+		evilPumpkinStem.update();
+		drawLines(this);
+		dealDamage(this);
+	}
+	evilPumpkin.destroy = function(){
+		makeEnemy([rint(512),rint(512),0]);
+		this.explosionFrame = 0;
+		this.isActor = false;
+		//this.actuallyDestroy();
+	}
+	rQ.push(evilPumpkin);
+}
+
+for(var i = 0; i < 10; i += 1){
+	makeEnemy([rint(512),rint(512),0]);
+}
+
+
+//add a reference to the center...
+var centerObj = new ob3D({pos:[0,0,-0.05],shape:centerPointShape});
+centerObj.update = function(){
+	this.pos[0] = ship.pos[0] + mpos[0];
+	this.pos[1] = ship.pos[1] + mpos[1];
+	drawLines(this);
+}
+rQ.push(centerObj);
+
+var heart = new act3D({
+	pos:[0,0,-0.05],
+	shape:shapes.altheartFrame,
+	health:Infinity,
+	damage:-1
+});
+heart.stateList = [
+	[2.9,2.9,2.9],
+	[1,1,1],
+];
+heart.name = 'OMG I AM THE HEART!';
+heart.state = 0;
+heart.interpStep = 0;
+heart.interpSteps = 10;
+var heartCore = new ob3D({shape:shapes.altheartCore});
+heartCore.pos = heart.pos;
+heartCore.rot = heart.rot;
+heartCore.scale = heart.scale;
+heart.update = function(){
+	var t = this;
+	t.rot[1] += deg * 5;
+	
+	var nextState = (t.state + 1) % (t.stateList.length);
+	//console.log(nextState);
+	if(t.interpStep <= t.interpSteps){
+		t.scale = nTerpolate(t.stateList[t.state],t.stateList[nextState],t.interpSteps,t.interpStep);
+		t.interpStep += 1;
+	}else{
+		heart.state = nextState;
+		t.interpStep = 0;
+	}
+	heartCore.scale = t.scale;
+	heartCore.update();
+	drawLines(t);
+	dealDamage(t);
+}
+rQ.push(heart);
+
+
+//the -0.1 is so it doesn't render overlapping anything else at z:0 accidentally.
+//Why is that a problem?
+//Because I'm doing z-depth based on the position of the whole object right now. :P
+var plane = new ob3D({
+	pos:[0,0,-0.1],
+	rot:[0,0,tau/8],
+	shape:planeGeom,
+	renderAlways:true
+});
+rQ.push(plane);
+
+
+
+var addBullet = function(pos,emitter){
+	var bullet = new act3D({
+		pos:pos,
+		rot:[0,tau/4,0],
+		rotOrder:[2,0,1],
+		shape:shapes.bullet
+	});
+	bullet.name = 'Bullet Bill';
+	bullet.speed = 20;
+	bullet.life = 200;
+	bullet.rot[0] = Math.atan2(mpos[0],mpos[1]) - tau/4;
+	bullet.vel = [Math.sin(bullet.rot[0] + tau/4)*bullet.speed,Math.cos(bullet.rot[0] + tau/4)*bullet.speed];
+	if(emitter !== undefined){
+		bullet.emitter = emitter;
+		//Uhh.. turned out that adding the vel of the player controlled object to the bullet vel was really, really weird.
+/*
+		if(emitter.vel !== undefined){
+		 bullet.vel[0] += emitter.vel[0];
+		 bullet.vel[1] += emitter.vel[1];
+		}
+*/
+	}
+	bullet.update = function(){
+		//z=depth from the camera kill?
+		//if((this.boundingBox[0][2] + this.pos[2]) < clipFar){
+		//number of frames alive kill
+		if(this.life <= 0){
+			this.destroy();
+		}else{
+			this.life -= 1
+			drawLines(this);
+			dealDamage(this);
+			//this.pos[2] -= 10;
+			this.pos[0] += this.vel[0];
+			this.pos[1] += this.vel[1];
+			this.rot[2] += tau / 36;
+		}
+	}
+	rQ.push(bullet);
+};
+
+canvas.onmousedown = function(){
+	//var pos = [mpos[0] - camera[0], mpos[1] - camera[1], -camera[2]];
+	var pos = [ship.pos[0], ship.pos[1], 0];
+	//console.log(pos);
+	addBullet(pos,ship);
+	return false;
+};
+
+
+
+//--------------------------------
+//Misc.
+//--------------------------------
+
+var drawCircle = function(x,y,radius,color){
+	if(x instanceof Array){
+		var y=x[1], x = x[0];
+	}
+	var radius = radius || 8;
+	c.beginPath();
+	c.strokeStyle = color || '#0f0';
+	c.lineCap = 'round';
+	c.lineJoin = 'round';
+	c.lineWidth = 2;
+	c.arc(x,y, radius, 0, tau, false);
+	c.stroke();
+}
+
+//--------------------------------
+//The basic render loop
+//--------------------------------
+
+
+var resize = function(){
+	cx=Math.floor(w/2);
+	cy=Math.floor(h/2);
+	mpos.x = 0;
+	mpos.y = 0;
+	canvas.width=w;
+	canvas.height=h;
+	wph=w+h;
+}
+
+//currentlyRenderingObject
+var cro = 0;
+var update = function(){
+	w=window.innerWidth;
+	h=window.innerHeight;
+	if(wph != w+h){resize();}
+	//c.fillStyle='rgba(0,0,0,0.7)';
+	c.clearRect(0,0,w,h);
+	c.save();
+	//c.strokeStyle = '#fff';
+	c.translate(cx,cy);
+
+	//camera[0] = mpos[0];
+	//camera[1] = mpos[1];
+	camera[0] = -ship.pos[0];
+	camera[1] = -ship.pos[1];
+	if(scroll !== 0){camera[2] += (scroll / Math.abs(scroll)) * 50; scroll = 0;}
+
+	//depth sorting!
+	rQ.sort(function(a,b) {return a.pos[2] - b.pos[2]})
+
+	for(cro = 0; cro < rQ.length; cro += 1){
+		rQ[cro].update();
+	}
+
+	drawCircle(0,0,256,'#666');
+	//ship.vel[0] = mpos[0]/20;
+	//ship.vel[1] = mpos[1]/20;
+
+	//console.log(heart.boundingBox[0]);
+	//console.log(rQ[0].pos[0]);
+	c.restore();
+	//console.log(totalRotationCalculations);
+	stats.update();
+	setTimeout(update,1000/60);
+}
+
+var stats = new Stats();
+stats.domElement.style.position = 'absolute';
+stats.domElement.style.top = '0px';
+stats.domElement.style.right = '0px';
+document.body.appendChild( stats.domElement );
+
+update();
+</script></body>
+</html>
