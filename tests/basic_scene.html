@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=100">
+<title>Basic Scene</title>
+</head>
+<body>
+<script src="../src/core.js"></script>
+<script src="../src/font.js"></script>
+<script src="../src/geom.sphere.js"></script>
+<script>
+
+var n = NPos3d;
+var scene = new n.Scene();
+var s = scene;
+console.log(scene);
+var c = s.c;
+var q = s.rQ;
+var lols = {
+	pos:{x:0,y:0},
+	update:function(){
+		var t = this;
+		//t.pos.x += 1;
+		c.beginPath();
+		c.moveTo(t.pos.x,t.pos.y);
+		c.lineTo(s.mpos.x,s.mpos.y);
+		c.strokeStyle = '#f00';
+		c.stroke();
+	}
+};
+console.log(lols.pos.x);
+
+var guy = {
+	pos:{x:0,y:0},
+	update:function(){
+		var t = this;
+		c.beginPath();
+		var a = Math.atan2(s.mpos.y,s.mpos.x);
+		t.pos.x += n.cos(a) * 2;
+		t.pos.y += n.sin(a) * 2;
+		c.moveTo(t.pos.x,t.pos.y);
+		c.arc(t.pos.x,t.pos.y,10,0,tau,false);
+		c.strokeStyle = '#0f0';
+		c.stroke();
+	}
+}
+
+var myCube = new n.Ob3D();
+myCube.update = function(s){
+	this.rot[0] += deg*1;
+	this.pos[0] = s.mpos.x;
+	this.pos[1] = s.mpos.y;
+	s.drawLines(this);
+}
+
+q.push(lols);
+q.push(guy);
+q.push(myCube);
+
+
+var allCharsString = 'abcdefghijklmnopqrstuvwxyz\nABCDEFGHIJKLMNOPQRSTUVWXYZ\n1234567890-=!@#$%^&*()_+\n{}|\\~`:;"\'<>,.?/'
+
+var myFirstText = new n.VText({
+	pos:[0,-100,100],
+	//string:'Roses are red,\nViolets are blue,\nSugar is sweet,\nTHE GAME',
+	//string:'are roses red?\nare violets blue?\nis sugar sweet?\nall parse as true.',
+	string:allCharsString,
+	textAlign:'center',
+	scale:[10,10,10],
+	renderAlways:true
+});
+myFirstText.up = myFirstText.update;
+myFirstText.inc1 = 0;
+myFirstText.inc2 = 0;
+myFirstText.update = function(s){
+	var t = this;
+	t.rot[1] += deg;
+	t.inc1 += 1;
+	t.inc2 += deg;
+	t.color = 'hsl(' + t.inc1 + ',100%,50%)';
+	//console.log(t.color);
+	//t.lastRotString = false;
+	//t.lineHeight = Math.sin(t.inc) * 15;
+	//t.string = (Math.round(t.inc2 * 100)).toString();
+	t.letterSpacing += Math.sin(t.inc2) * .05;
+	t.lineHeight += Math.cos(t.inc2) * .05;
+	t.up(s);
+}
+
+q.push(myFirstText);
+
+var mySecondText = new n.VText({string:'CATS!',scale:[10,10,0],textAlign:'center',pos:myCube.pos,rot:myCube.rot});
+q.push(mySecondText);
+
+var mySphereGeom = new n.Geom.Sphere({radius:100});
+var mySphere = new n.Ob3D({shape:mySphereGeom,pos:myCube.pos,rot:myCube.rot});
+q.push(mySphere);
+
+</script>
+</body>
+</html>
