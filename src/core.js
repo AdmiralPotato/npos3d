@@ -224,11 +224,12 @@ NPos3d.Scene.prototype={
 //This is where all of the 3D and math happens
 //--------------------------------
 	project3Dto2D:function(p3){
-		//return {x:p3[0],y:p3[1]};
+		//return {x:p3[0],y:p3[1]}; Orthographic!
 		var scale = this.camera.fov/(this.camera.fov + -p3[2]), p2 = {};
 		p2.x = (p3[0] * scale);
 		p2.y = (p3[1] * scale);
 		p2.scale = scale;
+		p2.color = p3[3] || false;
 		return p2;
 	},
 	square:function(num){return num * num;},
@@ -328,6 +329,18 @@ NPos3d.Scene.prototype={
 		}
 		return [min,max];
 	},
+	makeBBCubeFromTwoPoints:function(bbMinOffset,bbMaxOffset){
+		return [
+			[bbMinOffset[0],bbMinOffset[1],bbMaxOffset[2]],
+			[bbMaxOffset[0],bbMinOffset[1],bbMaxOffset[2]],
+			[bbMaxOffset[0],bbMaxOffset[1],bbMaxOffset[2]],
+			[bbMinOffset[0],bbMaxOffset[1],bbMaxOffset[2]],
+			[bbMinOffset[0],bbMinOffset[1],bbMinOffset[2]],
+			[bbMaxOffset[0],bbMinOffset[1],bbMinOffset[2]],
+			[bbMaxOffset[0],bbMaxOffset[1],bbMinOffset[2]],
+			[bbMinOffset[0],bbMaxOffset[1],bbMinOffset[2]],
+		];
+	},
 	lineRenderLoop:function(o){
 		var t = this, c = t.c;
 		var computedPointList = [];
@@ -372,7 +385,10 @@ NPos3d.Scene.prototype={
 	
 			//if the depths of the first and second point in the line are not behind the camera...
 			//and the depths of the first and second point in the line are closer than the far plane...
-			if(p3a[2] < t.camera.clipNear && p3b[2] < t.camera.clipNear && p3a[2] > t.camera.clipFar && p3b[2] > t.camera.clipFar){
+			if(p3a[2] < t.camera.clipNear &&
+			   p3b[2] < t.camera.clipNear &&
+			   p3a[2] > t.camera.clipFar &&
+			   p3b[2] > t.camera.clipFar){
 	
 				var p0 = t.project3Dto2D(p3a);
 				var p1 = t.project3Dto2D(p3b);
@@ -399,15 +415,18 @@ NPos3d.Scene.prototype={
 		//so I'll just do that once per frame and have a loop just for rotating the points.
 		if(o.lastRotString !== t.getP3String(o.rot) || o.lastScaleString !== t.getP3String(o.scale)){
 			//console.log(o.lastRotString);
+			o.transformedPointCache = [];
 			for(var i = 0; i < o.shape.points.length; i += 1){
 				//to make sure I'm not messing with the original array...
 				var point = [o.shape.points[i][0],o.shape.points[i][1],o.shape.points[i][2]];
 				point = t.getP3Scaled(point, o.scale);
 				point = t.getP3Rotated(point, o.rot, o.rotOrder);
+				point[3] = o.shape.points[i][3] || false;//Point Color Preservation - no need to offset or rotate it
 				o.transformedPointCache[i] = point;
 			}
 
 			//Now with Z-Depth sorting for each line on an object!
+			o.transformedLineCache = []; //Fixes a bug earlier where I -assumed- that transformedLineCache was already an array
 			for(var i = 0; i < o.shape.lines.length; i += 1){
 				//to make sure I'm not messing with the original array...
 				if(o.shape.lines[i][2] !== undefined){
@@ -417,17 +436,20 @@ NPos3d.Scene.prototype={
 				}
 				o.transformedLineCache[i] = line;
 			}
-			o.transformedLineCache.sort(function(a,b) {
-				var az = Math.min(
-					o.transformedPointCache[a[0]][2],
-					o.transformedPointCache[a[1]][2]
-				);
-				var bz = Math.min(
-					o.transformedPointCache[b[0]][2],
-					o.transformedPointCache[b[1]][2]
-				);
-				return az - bz;
-			});
+			//Fixing a nasty strange bug that happened if you sorted a one key array
+			if(o.transformedLineCache.length > 1){
+				o.transformedLineCache.sort(function(a,b) {
+					var az = Math.min(
+						o.transformedPointCache[a[0]][2],
+						o.transformedPointCache[a[1]][2]
+					);
+					var bz = Math.min(
+						o.transformedPointCache[b[0]][2],
+						o.transformedPointCache[b[1]][2]
+					);
+					return az - bz;
+				});
+			}
 			//end z-sorting for the lines
 
 			o.boundingBox = t.nGetBounds(o.transformedPointCache);
@@ -435,28 +457,19 @@ NPos3d.Scene.prototype={
 			o.lastRotString = t.getP3String(o.rot);
 		}
 	
-		var bbMinOffset = t.getP3Offset(t.getP3Offset(o.boundingBox[0], o.pos), t.camera.pos);
-		var bbMaxOffset = t.getP3Offset(t.getP3Offset(o.boundingBox[1], o.pos), t.camera.pos);
-	
 		if(o.renderAlways){
 			t.lineRenderLoop(o);
 			return;
 		}
 	
+		var bbMinOffset = t.getP3Offset(t.getP3Offset(o.boundingBox[0], o.pos), t.camera.pos);
+		var bbMaxOffset = t.getP3Offset(t.getP3Offset(o.boundingBox[1], o.pos), t.camera.pos);
+	
 		//Checking to see if any part of the bounding box is in front on the camera and closer than the far plane before bothering to do anything else...
 		if(bbMaxOffset[2] > t.camera.clipFar && bbMinOffset[2] < t.camera.clipNear && bbMaxOffset[2] > t.camera.clipFar && bbMaxOffset[2] < t.camera.clipNear){
 			//Alright. It's in front and not behind. Now is the bounding box even partially on screen?
 			//8 points determine the cube... let's start from the top left, spiraling down clockwise
-			var bbCube = [
-				[bbMinOffset[0],bbMinOffset[1],bbMaxOffset[2]],
-				[bbMaxOffset[0],bbMinOffset[1],bbMaxOffset[2]],
-				[bbMaxOffset[0],bbMaxOffset[1],bbMaxOffset[2]],
-				[bbMinOffset[0],bbMaxOffset[1],bbMaxOffset[2]],
-				[bbMinOffset[0],bbMinOffset[1],bbMinOffset[2]],
-				[bbMaxOffset[0],bbMinOffset[1],bbMinOffset[2]],
-				[bbMaxOffset[0],bbMaxOffset[1],bbMinOffset[2]],
-				[bbMinOffset[0],bbMaxOffset[1],bbMinOffset[2]],
-			];
+			var bbCube = t.makeBBCubeFromTwoPoints(bbMinOffset,bbMaxOffset);
 			var bbOffscreen = true;
 			//At some point in the future if I wanted to get really crazy, I could probably determine which order
 			//to sort the array above to orient the point closest to the center of the screen nearest the first of the list,
@@ -469,6 +482,102 @@ NPos3d.Scene.prototype={
 			}
 			if(!bbOffscreen){
 				t.lineRenderLoop(o);
+			}
+		}
+	},
+	drawPoints:function(o){
+		var t = this;
+		//I see no reason to check whether the rotation/scale is different between processing each point,
+		//so I'll just do that once per frame and have a loop just for rotating the points.
+		if(o.lastRotString !== t.getP3String(o.rot) || o.lastScaleString !== t.getP3String(o.scale)){
+			//console.log(o.lastRotString);
+			o.transformedPointCache = [];
+			for(var i = 0; i < o.shape.points.length; i += 1){
+				//to make sure I'm not messing with the original array...
+				var point = [o.shape.points[i][0],o.shape.points[i][1],o.shape.points[i][2]];
+				point = t.getP3Scaled(point, o.scale);
+				point = t.getP3Rotated(point, o.rot, o.rotOrder);
+				point[3] = o.shape.points[i][3] || false;//Point Color Preservation - no need to offset or rotate it
+				o.transformedPointCache[i] = point;
+			}
+			//Now with Z-Depth sorting for each point on an object!
+			if(o.transformedPointCache.length > 1){
+				o.transformedPointCache.sort(function(a,b) {
+					return a[2] - b[2];
+				});
+			}
+			//end z-sorting for the points
+
+			o.boundingBox = t.nGetBounds(o.transformedPointCache);
+			o.lastScaleString = t.getP3String(o.scale);
+			o.lastRotString = t.getP3String(o.rot);
+		}
+	
+		if(o.renderAlways){
+			t.pointRenderLoop(o);
+			return;
+		}
+	
+		var bbMinOffset = t.getP3Offset(t.getP3Offset(o.boundingBox[0], o.pos), t.camera.pos);
+		var bbMaxOffset = t.getP3Offset(t.getP3Offset(o.boundingBox[1], o.pos), t.camera.pos);
+	
+		//Checking to see if any part of the bounding box is in front on the camera and closer than the far plane before bothering to do anything else...
+		if(bbMaxOffset[2] > t.camera.clipFar && bbMinOffset[2] < t.camera.clipNear && bbMaxOffset[2] > t.camera.clipFar && bbMaxOffset[2] < t.camera.clipNear){
+			//Alright. It's in front and not behind. Now is the bounding box even partially on screen?
+			//8 points determine the cube... let's start from the top left, spiraling down clockwise
+			var bbCube = t.makeBBCubeFromTwoPoints(bbMinOffset,bbMaxOffset);
+			var bbOffscreen = true;
+			//At some point in the future if I wanted to get really crazy, I could probably determine which order
+			//to sort the array above to orient the point closest to the center of the screen nearest the first of the list,
+			//so I don't bother checking all 8 points to determine if it's on screen - or even off screen.
+			for(var i = 0; i < bbCube.length && bbOffscreen; i += 1){
+				bbp = t.project3Dto2D(bbCube[i]);
+				if(bbp.x < t.cx && bbp.x > -t.cx && bbp.y < t.cy && bbp.y > -t.cy){
+					bbOffscreen = false;
+				}
+			}
+			if(!bbOffscreen){
+				t.pointRenderLoop(o);
+			}
+		}
+	},
+	pointRenderLoop:function(o){
+		var t = this, c = t.c;
+		var computedPointList = [];
+		for(var i = 0; i < o.shape.points.length; i += 1){
+			//to make sure I'm not messing with the original array...
+			var point = [o.transformedPointCache[i][0],o.transformedPointCache[i][1],o.transformedPointCache[i][2]];
+			point = t.getP3Offset(point, o.pos);
+			point = t.getP3Offset(point, t.camera.pos);
+			point[3] = o.transformedPointCache[i][3] || false;//Point Color Preservation - no need to offset or rotate it
+			computedPointList[i] = point;
+		}
+		for(var i = 0; i < o.transformedPointCache.length; i += 1){
+			//offset the points by the object's position
+			var p3a = computedPointList[i];
+			//if the depth of the point is not behind the camera...
+			//and the depth of the point is closer than the far plane...
+			if(p3a[2] < t.camera.clipNear && p3a[2] > t.camera.clipFar){
+				var p0 = t.project3Dto2D(p3a);
+				//                   min        max
+				var screenBounds = [[-t.cx, -t.cy],[t.cx, t.cy]];
+				var p0InBounds = NPos3d.pointIn2dBounds([p0.x,p0.y],screenBounds);
+				//If the line is completely off screen, do not bother rendering it.
+				if(p0InBounds){
+					//console.log(p0.color);
+					c.moveTo(p0.x,p0.y);
+					c.beginPath();
+					c.arc(p0.x,p0.y,(p0.scale * o.pointScale),0,tau,false);
+					if(o.pointStyle === 'fill'){
+						c.fillStyle= p0.color || o.shape.color || '#fff';
+						c.fill();
+					}else if(o.pointStyle === 'stroke'){
+						c.strokeStyle= p0.color || o.shape.color || '#fff';
+						c.lineWidth=2;
+						c.lineCap='round';
+						c.stroke();
+					}
+				}
 			}
 		}
 	},
@@ -533,6 +642,25 @@ NPos3d.blessWith3DBase = function(o,args){
 	o.boundingBox = [[0,0,0],[0,0,0]];
 	o.shape = args.shape || o.shape;
 	o.renderAlways = args.renderAlways || false;
+	o.renderStyle = args.renderStyle || 'lines';//points, both
+	o.pointScale = args.pointScale || 2;
+	o.pointStyle = args.pointStyle || 'fill';//stroke
+	if(o.renderStyle === 'lines'){
+		o.render = function(){
+			s.drawLines(o);
+		}
+	}else if(o.renderStyle === 'points'){
+		o.render = function(){
+			s.drawPoints(o);
+		}
+	}else if(o.renderStyle === 'both'){
+		o.render = function(){
+			s.drawLines(o);
+			s.drawPoints(o);
+		}
+	}else{
+		throw 'Invalid renderStyle specified: ' + o.renderStyle;
+	}
 }
 NPos3d.Ob3D = function(args){
 	if(this === window){throw 'JIM TYPE ERROR';}
@@ -545,7 +673,7 @@ NPos3d.Ob3D = function(args){
 NPos3d.Ob3D.prototype = {
 	shape: NPos3d.Geom.cube,
 	update:function(s){
-		s.drawLines(this);
+		this.render();
 	},
 	destroy:NPos3d.destroyFunc
 };

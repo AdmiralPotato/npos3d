@@ -106,14 +106,20 @@ NPos3d.VText = function(args){
 	t.string = args.string || 'NEED INPUT';
 	t.textAlign = args.textAlign || 'left';
 	t.characterWidth = 2; //This is set static because of the design of the font.
+	t.characterHeight = 4; //This is set static because of the design of the font.
+	t.characterHeightOffset = 2; //This is set static because of the design of the font.
 	t.letterSpacing = args.letterSpacing || 1;
 	t.lineHeight = args.lineHeight || 6;
 	t.color = args.color || '#fff'; //Color is allowed in this ob type because text geom is autogen
-	t.stringCached = null;
+	t.stringCached = false;
 	t.font = args.font || NPos3d.Geom.font;
 	t.cacheTextGeom();
 }
 NPos3d.VText.prototype = {
+	getStateString:function(){
+		var t = this;
+		return (t.string + t.textAlign + t.characterWidth + t.letterSpacing + t.lineHeight).toString();
+	},
 	cacheTextGeom:function(){
 		var t = this;
 		//this line is -important-: if any text property changes, new point caches won't be updated without scaling or rotating the object.
@@ -169,7 +175,7 @@ NPos3d.VText.prototype = {
 						for(var p = 0; p < letter.points.length; p += 1){
 							t.shape.points.push([
 								letter.points[p][0] + ((t.characterWidth + t.letterSpacing) * offsetCharCount) + offsetSpacing,
-								letter.points[p][1] + (t.lineHeight * lineNum),
+								letter.points[p][1] + (t.lineHeight * lineNum) - t.characterHeightOffset,
 								letter.points[p][2] || 0
 							]);
 						}
@@ -177,6 +183,7 @@ NPos3d.VText.prototype = {
 							var line = letter.lines[l];
 							t.shape.lines.push([line[0] + offsetPointCount, line[1] + offsetPointCount]);
 						}
+						//console.log('#char',thisChar,'#points',t.shape.points,'#lines',t.shape.lines);
 						offsetPointCount = t.shape.points.length;
 					}else{
 						throw('This font does not contain the character "' + ch + '"');
@@ -189,15 +196,15 @@ NPos3d.VText.prototype = {
 			throw('You passed an unsupported textAlign type named "' + t.textAlign + '"');
 		}
 
-		t.stringCached = t.string + t.textAlign + t.characterWidth + t.letterSpacing + t.lineHeight;
+		t.stringCached = t.getStateString();
 	},
 	update:function(s){
 		var t = this;
-		if(t.string + t.textAlign + t.characterWidth + t.letterSpacing + t.lineHeight !== t.stringCached){
+		if(t.getStateString() !== t.stringCached){
 			t.cacheTextGeom();
 		}
 		t.shape.color = t.color;
-		s.drawLines(t);
+		t.render();
 	},
 	destroy:NPos3d.destroyFunc
 };

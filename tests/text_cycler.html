@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Text Cycler</title>
+</head>
+<body>
+<script src="../src/core.js"></script>
+<script src="../src/font.js"></script>
+<script>
+
+var n = NPos3d;
+var scene = new n.Scene();
+var s = scene;
+var c = s.c;
+var q = s.rQ;
+
+var charList = '!\#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~'.split('');
+//charList.reverse();
+
+var myText = new n.VText({string:'!',scale:[10,10,10],textAlign:'center'});
+q.push(myText);
+var myControl = {
+	pos:[0,0,0],
+	i:0,
+	state:0,
+	color:0,
+	update:function(){
+		//console.log(s.mpos);
+		//s.camera.pos = [-s.mpos.x,-s.mpos.y,0];
+		s.camera.pos = [0,0,-s.mpos.y * 4];
+		//myText.rot = [s.mpos.y /100,-s.mpos.x /100,0];
+		this.i+=1;
+		this.color += 10;
+		myText.color = 'hsl(' + this.color + ',100%,50%)';
+		myText.rot = [0,(deg * this.color),0];
+		if(this.i > 36){
+			this.state+=1;
+			if(this.state >= charList.length){
+				this.state = 0;
+			}
+			myText.string = charList[this.state];
+			this.i=0;
+			this.color = 0;
+		}
+	}
+}
+q.push(myControl);
+
+var STOPIT = function(){
+	console.log(s.interval);
+	window.clearInterval(s.interval);
+}
+
+//document.onclick = STOPIT;
+
+</script>
+</body>
+</html>

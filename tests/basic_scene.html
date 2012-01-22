@@ -8,6 +8,7 @@
 <script src="../src/core.js"></script>
 <script src="../src/font.js"></script>
 <script src="../src/geom.sphere.js"></script>
+<script src="../src/sprite.js"></script>
 <script>
 
 var n = NPos3d;
@@ -16,34 +17,7 @@ var s = scene;
 console.log(scene);
 var c = s.c;
 var q = s.rQ;
-var lols = {
-	pos:{x:0,y:0},
-	update:function(){
-		var t = this;
-		//t.pos.x += 1;
-		c.beginPath();
-		c.moveTo(t.pos.x,t.pos.y);
-		c.lineTo(s.mpos.x,s.mpos.y);
-		c.strokeStyle = '#f00';
-		c.stroke();
-	}
-};
-console.log(lols.pos.x);
 
-var guy = {
-	pos:{x:0,y:0},
-	update:function(){
-		var t = this;
-		c.beginPath();
-		var a = Math.atan2(s.mpos.y,s.mpos.x);
-		t.pos.x += n.cos(a) * 2;
-		t.pos.y += n.sin(a) * 2;
-		c.moveTo(t.pos.x,t.pos.y);
-		c.arc(t.pos.x,t.pos.y,10,0,tau,false);
-		c.strokeStyle = '#0f0';
-		c.stroke();
-	}
-}
 
 var myCube = new n.Ob3D();
 myCube.update = function(s){
@@ -53,12 +27,10 @@ myCube.update = function(s){
 	s.drawLines(this);
 }
 
-q.push(lols);
-q.push(guy);
 q.push(myCube);
 
 
-var allCharsString = 'abcdefghijklmnopqrstuvwxyz\nABCDEFGHIJKLMNOPQRSTUVWXYZ\n1234567890-=!@#$%^&*()_+\n{}|\\~`:;"\'<>,.?/'
+var allCharsString = 'abcdefghijklmnopqrstuvwxyz\nABCDEFGHIJKLMNOPQRSTUVWXYZ\n1234567890-=!@#$%^&*()_+\n{}|\\~`:;"\'<>,.?/';
 
 var myFirstText = new n.VText({
 	pos:[0,-100,100],
@@ -66,7 +38,7 @@ var myFirstText = new n.VText({
 	//string:'are roses red?\nare violets blue?\nis sugar sweet?\nall parse as true.',
 	string:allCharsString,
 	textAlign:'center',
-	scale:[10,10,10],
+	scale:[4,4,0],
 	renderAlways:true
 });
 myFirstText.up = myFirstText.update;
@@ -87,14 +59,17 @@ myFirstText.update = function(s){
 	t.up(s);
 }
 
-q.push(myFirstText);
+//q.push(myFirstText);
 
-var mySecondText = new n.VText({string:'CATS!',scale:[10,10,0],textAlign:'center',pos:myCube.pos,rot:myCube.rot});
+var mySecondText = new n.VText({string:'CATS!',scale:[10,10,0],textAlign:'center',pos:myCube.pos,rot:myCube.rot,color:'#09f'});
 q.push(mySecondText);
 
 var mySphereGeom = new n.Geom.Sphere({radius:100});
 var mySphere = new n.Ob3D({shape:mySphereGeom,pos:myCube.pos,rot:myCube.rot});
 q.push(mySphere);
+
+var mySprite = new n.Sprite3D({path:'../prelim_tests/sprites/megaman_heart_sprite_4x.png',numFrames:4,pos:[0,0,-10]});
+q.push(mySprite);
 
 </script>
 </body>

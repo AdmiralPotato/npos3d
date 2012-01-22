@@ -43,7 +43,7 @@ var justGiveMeData = function(url,callbackFunction,options){
 			callbackFunction(xhr.responseText,params);
 		}
 	}
-	xhr.open('GET', url+'?cacheKill='+Math.round(Math.random() * 999999), true);
+	xhr.open('GET', url+'?cacheKill='+Math.round(Math.random() * 999999).toString(), true);
 	xhr.send();
 }
 
@@ -140,9 +140,10 @@ var objToShapeParser = function(string,options){
 	}
 
 	//quick and dirty output. Oh yeah.
-	var formattedOutput = "var shapes = {\n";
+	//var formattedOutput = "var shapes = {\n";
+	var formattedOutput = "{\n";
 	formattedOutput += output.join(",\n");
-	formattedOutput += "\n};\n";
+	formattedOutput += "\n}";
 	//console.log(objectList);
 	return formattedOutput;
 }
