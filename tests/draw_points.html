@@ -20,13 +20,13 @@ window.onmousewheel = function(e){scroll=e.wheelDelta;}; //Chrome
 window.addEventListener('DOMMouseScroll',function(e){scroll=e.detail;},false); //FireFox. Wut. You. Smokin.
 
 var myCube = new n.Ob3D({scale:[10,10,10],renderStyle:'both',pointScale:20,pointStyle:'stroke'});
-q.push(myCube);
+s.add(myCube);
 
-var mySphere = new n.Ob3D({shape:new n.Geom.Sphere({color:'#666'}),scale:[5,5,5],renderStyle:'points',pointScale:10});
-q.push(mySphere);
+var mySphere = new n.Ob3D({shape:new n.Geom.Sphere({color:'#666'}),scale:[5,5,5],renderStyle:'points',pointScale:6});
+s.add(mySphere);
 
 var myText = new n.VText({string:'Gonna Draw Points!',textAlign:'center',scale:[5,5,5],renderStyle:'both',pointScale:1.5});
-q.push(myText);
+s.add(myText);
 
 var myControl = {
 	pos:[0,0,0],
@@ -49,14 +49,14 @@ var myControl = {
 		myText.rot = myCube.rot;
 	}
 }
-q.push(myControl);
+s.add(myControl);
 
 var STOPIT = function(){
 	console.log(s.interval);
 	window.clearInterval(s.interval);
 }
 
-document.onclick = STOPIT;
+//document.onclick = STOPIT;
 
 </script>
 </body>

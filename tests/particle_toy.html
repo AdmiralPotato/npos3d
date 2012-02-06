@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Particle Toy</title>
+</head>
+<body>
+<script src="../src/core.js"></script>
+<script>
+var n = NPos3d;
+var s = new n.Scene({frameRate:40});
+var q = s.rQ;
+var rand = function(num){
+	return (Math.random() * (num * 2)) - num;
+}
+var Particle = function(args){
+	if(this === window){throw 'You must access the Particle cinstructor method using the `new` keyword.'}
+	var t = this;
+	var args = args || {};
+	n.blessWith3DBase(t,args);
+	t.vel = args.vel || [0,0,0];
+	t.life = args.life || 200;
+	t.log = args.log || false;
+	t.rotSpeed = args.rotSpeet || rand(1);
+	t.shape = {points:[[20,0,0,'hsl(90,100%,50%)'],[0,0,0,'hsl(45,100%,50%)']],lines:[[0,1,'#555']]};
+	return t;
+}
+Particle.prototype = {
+	renderStyle:'both',
+	pointStyle:'fill',
+	pointScale:3,
+	addVel:function(){
+		var t=this;
+		if(Math.abs(t.vel[0]) + Math.abs(t.vel[1]) + Math.abs(t.vel[2])){
+			t.pos[0] += t.vel[0];
+			t.pos[1] += t.vel[1];
+			t.pos[2] += t.vel[2];
+		}
+	},
+	update:function(){
+		var t=this;
+		t.life -= 1;
+		t.addVel();
+		var opac = Math.abs(sin((tau/100) * t.life));
+		if(t.log){
+			//console.log(opac);
+		}
+		//t.shape.points[0][3] = 'hsla(90,100%,50%,' + opac + ')';
+		//t.lastRotString = false;
+		t.pointScale = (opac * 3) + 1;
+		t.rot[2] += (tau/30) * t.rotSpeed;
+		t.render();
+		if(t.life < 1){
+			t.destroy();
+			makeParticle();
+		}
+	}
+};
+var makeParticle = function(log){
+	var myParticle = new Particle({
+		log:log,
+		pos:[s.mpos.x,s.mpos.y,0],
+		life:Math.random() * 100,
+		vel:[rand(5),rand(5),rand(10)]
+	});
+	s.add(myParticle);
+}
+
+//makeParticle(true);
+for(var i = 0; i < 100; i += 1){
+	makeParticle();
+}
+</script>
+</bdoy>
+</html>

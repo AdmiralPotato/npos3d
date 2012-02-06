@@ -37,7 +37,7 @@ var lOffset = {
 	//this.pos[1] = s.mpos.y;
 	}
 }
-q.push(lOffset);
+s.add(lOffset);
 
 var myCube = new n.Ob3D({pos:lOffset.pos, rot:lOffset.rot, scale:[15,15,15]});
 myCube.shape.color = 'rgba(255,255,255,.1)';
@@ -49,7 +49,7 @@ myCube.update = function(s){
 }
 */
 myCube.shape.color='#f00';
-q.push(myCube);
+s.add(myCube);
 
 
 var shapes = {};
@@ -67,16 +67,19 @@ var justDoIt = function(string){
 }
 justGiveMeData('pn3_test_shapes.obj',justDoIt);
 
-var myOb = new n.Ob3D({pos:lOffset.pos, rot:lOffset.rot, scale:[300,300,300],renderStyle:'points',pointStyle:'stroke',pointScale:3});
-q.push(myOb);
+var myOb = new n.Ob3D({pos:lOffset.pos, rot:lOffset.rot, scale:[300,300,300],renderStyle:'points',pointStyle:'stroke',pointScale:2});
+s.add(myOb);
 var myText = new n.VText({string:'Loading Image...',textAlign:'center', pos:lOffset.pos, rot:lOffset.rot, scale:[8,8,8]});
-q.push(myText);
+s.add(myText);
 var myIdea;
+
 var getImageAsMesh = function(imagePath){
-	myIdea = new n.Geom.PN3({path:imagePath + '?cachekill='+Math.round(Math.random()*999999),callback:ideaCallback});
+	var path = imagePath + '?cachekill='+Math.round(Math.random()*999999);
+	myIdea = new n.Geom.PN3({path:path,callback:ideaCallback,id:'myIdeaCanvas'});
 }
 
 var ideaCallback = function(){
+	//console(n.Geom.PN3);
 	myOb.shape = myIdea;
 	myOb.lastRotString = false;
 	myText.string = myIdea.points.length + ' points';
@@ -84,6 +87,7 @@ var ideaCallback = function(){
 }
 var imageList = [
 	//'img/png.png',
+	'img/megface.png',
 	'img/rupeebev.png',
 	'img/rupee.png',
 	'img/heartsub.png',
@@ -96,9 +100,7 @@ var imageList = [
 	'img/meg.png',
 	'img/noise_spectrum_16.png',
 	'img/noise_spectrum_32.png',
-	'img/png.png',
 	'img/spectrum_16.png',
-	'img/spectrum_24_hue.png',
 	'img/spectrum_24_luminosity.png',
 	'img/spectrum_24.png',
 	'img/spectrum_32.png',
@@ -113,7 +115,7 @@ getImageAsMesh(imageList[imageState]);
 
 var imageAdvance = function(e){
 	e.preventDefault();
-	console.log(e);
+	//console.log(e);
 	imageState += 1;
 	if(imageState >= imageList.length){
 		imageState = 0;

@@ -48,6 +48,7 @@ var NPos3d = NPos3d || {
 	deg:(Math.PI / 180),
 	sin:Math.sin,
 	cos:Math.cos,
+	square:function(num){return num * num;},
 	//--------------------------------
 	//Some basic boundary / collission testing maths.
 	//--------------------------------
@@ -170,7 +171,7 @@ NPos3d.Scene = function(args){
 		t.c.restore();
 	}
 
-	t.interval = setInterval(t.update,1000/t.framerate);
+	t.interval = setInterval(t.update,1000/t.frameRate);
 	
 	t.globalize();
 	return this;
@@ -178,12 +179,13 @@ NPos3d.Scene = function(args){
 
 NPos3d.Scene.prototype={
 	globalize:function(){
-		//Because it's a pain to have to reference too much.
+		//Because it's a pain to have to reference too much. I'll unpack my tools so I can get to work.
 		window.pi = NPos3d.pi;
 		window.tau = NPos3d.tau;
 		window.deg = NPos3d.deg;
 		window.sin = NPos3d.sin;
 		window.cos = NPos3d.cos;
+		window.square = NPos3d.square;
 	},
 	resize:function(){
 		var t = this;
@@ -232,10 +234,9 @@ NPos3d.Scene.prototype={
 		p2.color = p3[3] || false;
 		return p2;
 	},
-	square:function(num){return num * num;},
 	getRelativeAngle3d:function(p3){ //DO NOT try to optomize out the use of sqrt in this function!!!
 		var topAngle =  Math.atan2(p3[0], p3[1]);
-		var sideAngle = tau - Math.atan2(p3[2], Math.sqrt(this.square(p3[0]) + this.square(p3[1])));
+		var sideAngle = tau - Math.atan2(p3[2], Math.sqrt(NPos3d.square(p3[0]) + NPos3d.square(p3[1])));
 		return [sideAngle,0,-topAngle];
 	},
 	pointAt:function(o,endPos){
@@ -581,11 +582,17 @@ NPos3d.Scene.prototype={
 			}
 		}
 	},
-	destroyFunc:function(){
-		if(this === window){throw 'JIM TYPE ERROR';}
-		for(var i = 0; i < rQ.length; i += 1){
-			if(t.rQ[i] === this){
+	add:function(o){
+		//I may rename this to addChild in the future. Hmm...
+		o.scene = this;
+		this.rQ.push(o);
+	},
+	remove:function(o){
+		var t = this;
+		for(var i = 0; i < t.rQ.length; i += 1){
+			if(t.rQ[i] === o){
 				t.rQ.splice(i,1);
+				o.scene = false;
 				//I FOUND THE BLINKING FOR REAL THIS TIME!!!
 				//console.log(cro,i);
 				//If the object being removed from the render queue is positioned earlier than
@@ -599,6 +606,13 @@ NPos3d.Scene.prototype={
 		}
 	}
 };
+
+NPos3d.destroyFunc = function(){
+	var t = this;
+	if(t.scene){
+		t.scene.remove(t);
+	}
+}
 
 NPos3d.Camera = function(args){
 	var t = this;
@@ -632,48 +646,48 @@ NPos3d.Geom.cube = {
 
 NPos3d.blessWith3DBase = function(o,args){
 	o.pos = args.pos || [0,0,0];
-	o.rot = args.rot ||[0,0,0];
-	o.rotOrder = args.rotOrder || [0,1,2];
-	o.scale = args.scale || [1,1,1];
+	o.rot = args.rot || [0,0,0];
+	o.rotOrder = args.rotOrder || o.rotOrder || [0,1,2];
+	o.scale = args.scale || o.scale || [1,1,1];
 	o.lastScaleString = false;
 	o.lastRotString = false;
 	o.transformedPointCache = [];
 	o.transformedLineCache = [];
 	o.boundingBox = [[0,0,0],[0,0,0]];
 	o.shape = args.shape || o.shape;
-	o.renderAlways = args.renderAlways || false;
-	o.renderStyle = args.renderStyle || 'lines';//points, both
-	o.pointScale = args.pointScale || 2;
-	o.pointStyle = args.pointStyle || 'fill';//stroke
+	o.renderAlways = args.renderAlways || o.renderAlways || false;
+	o.renderStyle = args.renderStyle || o.renderStyle || 'lines';//points, both
+	o.pointScale = args.pointScale || o.pointScale || 2;
+	o.pointStyle = args.pointStyle || o.pointStyle || 'fill';//stroke
+	o.scene = false; //An object should know which scene it's in, if it would like to be destroyed.
 	if(o.renderStyle === 'lines'){
 		o.render = function(){
-			s.drawLines(o);
+			o.scene.drawLines(o);
 		}
 	}else if(o.renderStyle === 'points'){
 		o.render = function(){
-			s.drawPoints(o);
+			o.scene.drawPoints(o);
 		}
 	}else if(o.renderStyle === 'both'){
 		o.render = function(){
-			s.drawLines(o);
-			s.drawPoints(o);
+			o.scene.drawLines(o);
+			o.scene.drawPoints(o);
 		}
 	}else{
 		throw 'Invalid renderStyle specified: ' + o.renderStyle;
 	}
+	o.destroy = NPos3d.destroyFunc;
 }
 NPos3d.Ob3D = function(args){
 	if(this === window){throw 'JIM TYPE ERROR';}
 	if(arguments.length > 1){throw 'ob3D expects only one param, an object with the named arguments.';}
-	var t = this;
 	var args = args || {};
-	NPos3d.blessWith3DBase(t,args);
+	NPos3d.blessWith3DBase(this,args);
 	return this;
 }
 NPos3d.Ob3D.prototype = {
 	shape: NPos3d.Geom.cube,
 	update:function(s){
 		this.render();
-	},
-	destroy:NPos3d.destroyFunc
+	}
 };

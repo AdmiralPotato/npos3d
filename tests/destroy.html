@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Destroy</title>
+</head>
+<body>
+<script src="../src/core.js"></script>
+<script>
+var n = NPos3d;
+var s = new n.Scene();
+var q = s.rQ;
+
+var myQube = new n.Ob3D({
+	rot:[tau/8,tau/6,0]
+});
+myQube.update = function(){
+	var t = this;
+	t.rot[1] += (tau/100);
+	t.rot[2] += (tau/100);
+	t.render();
+}
+s.add(myQube);
+
+myQube.destroy();
+
+</script>
+</body>
+</html>

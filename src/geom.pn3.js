@@ -8,6 +8,8 @@ NPos3d.Geom.PN3 = function(args){
 	t.centerData = args.centerData || true;
 	t.scaleData = args.scaleData || true;
 
+	t.id = args.id || 'PN3_default_canvas';
+
 	if(t.centerData){
 		var centerData = function(p3){return [p3[0] -128,p3[1] -128,p3[2] -128];}
 	}else{
@@ -19,14 +21,19 @@ NPos3d.Geom.PN3 = function(args){
 	}else{
 		var scaleData = function(p3){return p3;}
 	}
-
-	t.canvas = document.createElement('canvas');
-	//t.canvas.style.display='block';
-	//t.canvas.style.position='absolute';
-	//t.canvas.style.top='50%';
-	//t.canvas.style.left='50%';
-	//document.body.appendChild(t.canvas);
-	t.canvas.style.left='50%';
+	t.canvas = document.getElementById(t.id);
+	if(!t.canvas){
+		t.canvas = document.createElement('canvas');
+		t.canvas.id = t.id;
+	}
+	t.canvas.style.display='block';
+	t.canvas.style.position='fixed';
+	t.canvas.style.right='0px';
+	t.canvas.style.bottom='0px';
+	t.canvas.style.zIndex = 9001;
+	t.canvas.style.imageRendering = '-moz-crisp-edges';
+	t.canvas.style.imageRendering = '-webkit-optimize-contrast';
+	document.body.appendChild(t.canvas);
 	t.c = t.canvas.getContext('2d');
 	t.width = 0;
 	t.height = 0;
@@ -41,6 +48,9 @@ NPos3d.Geom.PN3 = function(args){
 		t.loaded = true;
 		t.canvas.width = t.width;
 		t.canvas.height = t.height;
+		t.c.clearRect(0,0,t.width,t.height); //clearing the canvas, in case anything is left from an image with the same size loading in.
+		t.canvas.style.width = t.width * 4 + 'px';
+		t.canvas.style.height = t.height * 4 + 'px';
 		t.c.drawImage(t.image,0,0);
 		t.data = t.c.getImageData(0,0,t.width,t.height).data;
 		for(var y = 0; y < t.height; y += 1){
@@ -64,7 +74,7 @@ NPos3d.Geom.PN3 = function(args){
 		}
 		
 		var p4 = t.getPixel(0,0);
-		console.log('First point color:',p4);
+		//console.log('First point color:',p4);
 		t.lines.push([0, t.points.length -1, 'rgb(' + p4[0] + ',' + p4[1] + ',' + p4[2] + ')']);
 		args.callback(t);
 		//console.log(t);

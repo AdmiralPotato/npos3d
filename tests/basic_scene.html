@@ -27,7 +27,7 @@ myCube.update = function(s){
 	s.drawLines(this);
 }
 
-q.push(myCube);
+s.add(myCube);
 
 
 var allCharsString = 'abcdefghijklmnopqrstuvwxyz\nABCDEFGHIJKLMNOPQRSTUVWXYZ\n1234567890-=!@#$%^&*()_+\n{}|\\~`:;"\'<>,.?/';
@@ -59,17 +59,17 @@ myFirstText.update = function(s){
 	t.up(s);
 }
 
-//q.push(myFirstText);
+//s.add(myFirstText);
 
 var mySecondText = new n.VText({string:'CATS!',scale:[10,10,0],textAlign:'center',pos:myCube.pos,rot:myCube.rot,color:'#09f'});
-q.push(mySecondText);
+s.add(mySecondText);
 
 var mySphereGeom = new n.Geom.Sphere({radius:100});
 var mySphere = new n.Ob3D({shape:mySphereGeom,pos:myCube.pos,rot:myCube.rot});
-q.push(mySphere);
+s.add(mySphere);
 
 var mySprite = new n.Sprite3D({path:'../prelim_tests/sprites/megaman_heart_sprite_4x.png',numFrames:4,pos:[0,0,-10]});
-q.push(mySprite);
+s.add(mySprite);
 
 </script>
 </body>
