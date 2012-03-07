@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=100">
+<title>PN3 Image Manip Toy</title>
+</head>
+<body>
+<script src="../src/core.js"></script>
+<script src="../src/font.js"></script>
+<script src="../src/geom.pn3.js"></script>
+<script src="../tools/convert_obj_to_shape.js"></script>
+<script>
+
+var n = NPos3d;
+var scene = new n.Scene({frameRate:60});
+var s = scene;
+var c = s.c;
+var q = s.rQ;
+
+var scroll = 1;
+window.onmousewheel = function(e){scroll=e.wheelDelta;}; //Chrome
+window.addEventListener('DOMMouseScroll',function(e){scroll=e.detail;},false); //FireFox. Wut. You. Smokin.
+
+var userControl = {
+	pos:[0,0,0],
+	rot:[0,0,0],
+	update:function(){
+	//this.rot[0] += deg*1;
+	this.rot[1] = -deg*s.mpos.x /2;
+	this.rot[0] = deg*s.mpos.y /2;
+	scene.camera.pos[2] += (scroll/8);
+	scroll = 0;
+	//this.pos[0] = s.mpos.x;
+	//this.pos[1] = s.mpos.y;
+	}
+}
+s.add(userControl);
+
+var myCube = new n.Ob3D({pos:userControl.pos, rot:userControl.rot, scale:[15,15,15]});
+myCube.shape.color='#f00';
+s.add(myCube);
+var myText = new n.VText({string:'Loading Image...',textAlign:'center', pos:userControl.pos, rot:userControl.rot, scale:[8,8,8]});
+s.add(myText);
+
+
+var ImageSegmenter = function(args){
+	if(this === window){throw 'You must use the `new` keyword when calling constructor methods.';}
+	var t = this;
+	var args = args || {};
+	if(args.path === undefined){throw 'You must provide an image path to this constructor.';}
+	if(!args.numFrames){throw 'You must specity the number of frames in this animation.';}
+	t.numFrames = args.numFrames;
+	t.path = args.path;
+	t.canvas = document.createElement('canvas');
+	t.c = t.canvas.getContext('2d');
+	t.imageDataStringList = [];
+	t.shapeList = [];
+	t.image = document.createElement('img');
+	t.image.onload = function(){
+		t.canvas.width = t.image.width / t.numFrames;
+		t.canvas.height = t.image.height;
+		for(var i = 0; i < t.numFrames; i += 1){
+			t.c.clearRect(0,0,t.canvas.width,t.canvas.height);
+			t.c.drawImage(t.image,(t.canvas.width * -i),0);
+			t.imageDataStringList[i] = t.canvas.toDataURL();
+			t.shapeList[i] = myIdea = new n.Geom.PN3({
+				path:t.imageDataStringList[i],
+				callback:pn3Callback,
+				id:'myIdeaCanvas'
+			});
+		}
+	}
+	t.image.src = t.path;
+	return t;
+}
+
+var configObject = {
+	path:'img/heartsub_anim_360.png',
+	numFrames:360
+};
+
+var mySegmentList = new ImageSegmenter(configObject);
+
+
+var myOb = new n.Ob3D({pos:userControl.pos, rot:userControl.rot, scale:[300,300,300],renderStyle:'points',pointStyle:'fill',pointScale:3,renderAlways:true});
+myOb.frame = 0;
+myOb.update = function(){
+	var t = this;
+	t.lastRotString = false;
+	t.shape = mySegmentList.shapeList[t.frame];
+	t.render();
+	t.shape.c.drawImage(t.shape.image,0,0);
+	t.frame += 1;
+	if(t.frame >= (mySegmentList.shapeList.length -1)){
+		t.frame = 0;
+	}
+}
+
+var howManyImagesHaveBeenParsedToShapesSoFar = 0;
+var pn3Callback = function(o){
+	howManyImagesHaveBeenParsedToShapesSoFar += 1;
+	if(howManyImagesHaveBeenParsedToShapesSoFar >= (configObject.numFrames -1)){
+		myText.string = 'LOADED!';
+		s.add(myOb);
+	}
+}
+
+
+
+</script>
+</body>
+</html>

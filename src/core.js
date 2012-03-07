@@ -101,13 +101,20 @@ NPos3d.Scene = function(args){
 	t.mpos = {x:0,y:0};
 	t.camera = new NPos3d.Camera();
 	t.frameRate = args.frameRate || 30;
+	t.pixelScale = args.pixelScale || 1;
 
 	var isMobile = (/iphone|ipad|ipod|android|blackberry|mini|windows\sce|palm/i.test(navigator.userAgent.toLowerCase()));
 	if(isMobile){
-		t.checkWindow = function(){t.w = window.outerWidth;t.h = window.outerHeight;};
+		t.checkWindow = function(){
+			t.w = Math.ceil(window.outerWidth / t.pixelScale);
+			t.h = Math.ceil(window.outerHeight / t.pixelScale);
+		};
 	}
 	else{
-		t.checkWindow = function(){t.w = window.innerWidth;t.h = window.innerHeight;};
+		t.checkWindow = function(){
+			t.w = Math.ceil(window.innerWidth / t.pixelScale);
+			t.h = Math.ceil(window.innerHeight / t.pixelScale);
+		};
 	}
 
 	t.canvasId = args.canvasId || 'canvas';
@@ -117,10 +124,16 @@ NPos3d.Scene = function(args){
 	t.canvas.parentNode.style.margin=0;
 	t.canvas.parentNode.style.padding=0;
 	t.canvas.style.display='block';
-	t.canvas.style.position='fixed';
 	t.canvas.style.top=0;
 	t.canvas.style.left=0;
 	t.canvas.style.zIndex=-10;
+	if(t.pixelscale !== 1){
+		t.canvas.style.imageRendering = '-moz-crisp-edges';
+		t.canvas.style.imageRendering = '-webkit-optimize-contrast';
+	}else if(!isMobile){
+		t.canvas.style.position='fixed';
+	}
+	t.lineWidth = args.lineWidth || undefined;
 
 	t.checkWindow();
 	t.resize();
@@ -134,11 +147,15 @@ NPos3d.Scene = function(args){
 		//console.dir(e);
 		e.preventDefault();
 		if(e.touches && e.touches.length){
-			t.mpos.x = e.touches[0].screenX - t.cx;
-			t.mpos.y = e.touches[0].screenY - t.cy;
+			//t.mpos.x = e.touches[0].screenX - t.cx;
+			//t.mpos.y = e.touches[0].screenY - t.cy;
+			t.mpos.x=Math.ceil((e.touches[0].screenX / t.pixelScale) - t.cx);
+			t.mpos.y=Math.ceil((e.touches[0].screenY / t.pixelScale) - t.cy);
 		}else{
-			t.mpos.x = e.pageX - t.cx;
-			t.mpos.y = e.pageY - t.cy;
+			//t.mpos.x = e.pageX - t.cx;
+			//t.mpos.y = e.pageY - t.cy;
+			t.mpos.x=Math.ceil((e.pageX / t.pixelScale) - t.cx);
+			t.mpos.y=Math.ceil((e.pageY / t.pixelScale) - t.cy);
 		}
 	}
 	window.addEventListener('mousemove',t.mouseHandler,false);
@@ -195,6 +212,10 @@ NPos3d.Scene.prototype={
 		t.mpos.y = 0;
 		t.canvas.width=t.w;
 		t.canvas.height=t.h;
+		if(t.pixelScale !== 1){
+			t.canvas.style.width = t.w*t.pixelScale + 'px';
+			t.canvas.style.height = t.h*t.pixelScale + 'px';
+		}
 		t.lw=t.w;
 		t.lh=t.h;
 		//Normally, this function would end here,
@@ -402,8 +423,8 @@ NPos3d.Scene.prototype={
 					c.beginPath();
 					c.moveTo(p0.x,p0.y);
 					c.lineTo(p1.x,p1.y);
-					c.strokeStyle= o.transformedLineCache[i][2] || o.shape.color || '#fff';
-					c.lineWidth=2;
+					c.strokeStyle= o.transformedLineCache[i][2] || o.shape.color || o.color || '#fff';
+					c.lineWidth= o.lineWidth || o.scene.lineWidth || 2;
 					c.lineCap='round';
 					c.stroke();
 				}
@@ -574,7 +595,7 @@ NPos3d.Scene.prototype={
 						c.fill();
 					}else if(o.pointStyle === 'stroke'){
 						c.strokeStyle= p0.color || o.shape.color || '#fff';
-						c.lineWidth=2;
+						c.lineWidth= o.lineWidth || o.scene.lineWidth || 2;
 						c.lineCap='round';
 						c.stroke();
 					}
@@ -659,6 +680,7 @@ NPos3d.blessWith3DBase = function(o,args){
 	o.renderStyle = args.renderStyle || o.renderStyle || 'lines';//points, both
 	o.pointScale = args.pointScale || o.pointScale || 2;
 	o.pointStyle = args.pointStyle || o.pointStyle || 'fill';//stroke
+	o.lineWidth = args.lineWidth || undefined;
 	o.scene = false; //An object should know which scene it's in, if it would like to be destroyed.
 	if(o.renderStyle === 'lines'){
 		o.render = function(){

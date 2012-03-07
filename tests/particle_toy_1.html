@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Particle Toy 1</title>
+</head>
+<body>
+<script src="../src/core.js"></script>
+<script>
+var n = NPos3d;
+var s = new n.Scene({frameRate:40});
+var q = s.rQ;
+var rand = function(num){
+	return (Math.random() * (num * 2)) - num;
+}
+
+var delay = 0;
+
+var CurlyParticle = function(args){
+	if(this === window){throw 'Use the `new` operator when initiating constructors!';}
+	var args = args || {};
+	var t = this;
+	n.blessWith3DBase(t, args);
+	t.vel = args.vel || [0,0,0];
+	t.curl = args.curl || [0,0,0];
+	t.life = args.life || rand(200) + 200;
+	t.lifeTime = t.life;
+	t.color = '#f00';
+	return this;
+}
+CurlyParticle.prototype = {
+	shape:{points:[[0,0,0],[0,10,0],[10,0,0],[0,0,10]],lines:[[0,1],[0,2],[0,3]]},
+	update:function(){
+		var t = this;
+		var oldPos = t.pos;
+		t.vel = s.getP3Rotated(t.vel,t.curl,[0,1,2]);
+		t.pos = s.getP3Offset(t.pos,t.vel);
+		s.pointAt(t,oldPos);
+		this.render();
+		t.life -= 1;
+		t.color = 'rgba(255,0,0,' + (t.life / t.lifeTime) + ')';
+		if(t.life < 1){
+			t.destroy();
+			makeParticle();
+		}
+	}
+}
+var pn = 1;
+var makeSymetricalSpiral = function(offset){
+	var offset = offset || 0;
+	if(pn === 1){pn = -1;}else{pn = 1;}
+	var myParticle = new CurlyParticle({
+		//vel:[rand(5),rand(5),rand(5)],
+		life: 150 + offset,
+		vel:[pn*2,pn*4,0],
+		//curl:[rand(deg * 3),rand(deg * 3),rand(deg * 3)]
+		curl:[(deg * s.mpos.x / 25),(deg * s.mpos.y / 25),0]
+	});
+	s.add(myParticle);
+}
+
+
+var makeChaos = function(offset){
+	var offset = offset || 0;
+	if(pn === 1){pn = -1;}else{pn = 1;}
+	var myParticle = new CurlyParticle({
+		vel:[rand(5),rand(5),rand(5)],
+		curl:[rand(deg * 3),rand(deg * 3),rand(deg * 3)]
+	});
+	s.add(myParticle);
+}
+
+var makeParticle = makeSymetricalSpiral;
+
+
+var functionList = [makeSymetricalSpiral,makeChaos];
+var functionState = 0;
+document.body.onclick = function(e){
+	console.log(e);
+	functionState = (functionState + 1) % functionList.length;
+	makeParticle = functionList[functionState];
+}
+//console.log(s.canvas);
+
+
+for(var i = 0; i < 149; i += 1){
+	makeParticle(-i);
+}
+</script>
+</bdoy>
+</html>

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=100">
+<title>Basic Scene + pixelScale</title>
+</head>
+<body>
+<script src="../src/core.js"></script>
+<script src="../src/font.js"></script>
+<script src="../src/geom.sphere.js"></script>
+<script src="../src/sprite.js"></script>
+<script>
+
+var n = NPos3d;
+var s = new n.Scene({
+	lineWidth:0.75,
+	pixelScale:2,
+	frameRate:40
+});
+var c = s.c;
+var q = s.rQ;
+
+
+var mySphereGeom = new n.Geom.Sphere({radius:100});
+var mySphere = new n.Ob3D({shape:mySphereGeom,scale:[.5,.5,.5],renderAlways:true});
+mySphere.update = function(s){
+	this.rot[0] += deg*1;
+	this.pos[0] = s.mpos.x;
+	this.pos[1] = s.mpos.y;
+	this.render();
+}
+s.add(mySphere);
+
+var myPoem = new n.VText({
+	pos:mySphere.pos,
+	rot:mySphere.rot,
+	string:'are roses red?\nare violets blue?\nis sugar sweet?\nall parse as true.',
+	textAlign:'center',
+	scale:[3,3,0],
+	renderAlways:true,
+	color: '#f00'
+});
+s.add(myPoem);
+
+</script>
+</body>
+</html>
