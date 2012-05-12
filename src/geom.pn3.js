@@ -4,6 +4,7 @@ NPos3d.Geom.PN3 = function(args){
 	var args = args || {};
 	if(!args.path){throw 'You MUST provide an image `path` value!';}
 	if(!args.callback){throw 'You MUST provide a `callback` method!';}
+	t.callback = args.callback;
 
 	t.centerData = args.centerData || true;
 	t.scaleData = args.scaleData || true;
@@ -26,14 +27,16 @@ NPos3d.Geom.PN3 = function(args){
 		t.canvas = document.createElement('canvas');
 		t.canvas.id = t.id;
 	}
-	t.canvas.style.display='block';
-	t.canvas.style.position='fixed';
-	t.canvas.style.right='0px';
-	t.canvas.style.bottom='0px';
-	t.canvas.style.zIndex = 9001;
-	t.canvas.style.imageRendering = '-moz-crisp-edges';
-	t.canvas.style.imageRendering = '-webkit-optimize-contrast';
-	document.body.appendChild(t.canvas);
+	if(args.showCanvas){
+		t.canvas.style.display='block';
+		t.canvas.style.position='fixed';
+		t.canvas.style.right='0px';
+		t.canvas.style.bottom='0px';
+		t.canvas.style.zIndex = 9001;
+		t.canvas.style.imageRendering = '-moz-crisp-edges';
+		t.canvas.style.imageRendering = '-webkit-optimize-contrast';
+		document.body.appendChild(t.canvas);
+	};
 	t.c = t.canvas.getContext('2d');
 	t.width = 0;
 	t.height = 0;
@@ -61,22 +64,24 @@ NPos3d.Geom.PN3 = function(args){
 					//console.log('I did nothing because it was transparent black!');
 				}else if(p4[3] == 0){
 					//console.log('I did nothing because it was completely transparent!');
+				}else if(p4[3] == 128){
+					//t.lines.push(t.convertP4ToLine(p4)); //Broken until Color Gamma Shift on Transparent Pixels is addressed
 				}else{
 					var pointColor = 'rgb(' + p4[0] + ',' + p4[1] + ',' + p4[2] + ')';
 					var point = scaleData(centerData(p4));
 					point[3] = pointColor;
 					t.points.push(point);
 					if(t.points.length > 1){
-						t.lines.push([t.points.length -2, t.points.length -1, pointColor]);
+						//t.lines.push([t.points.length -2, t.points.length -1, pointColor]);
 					}
 				}
 			}
 		}
 		
-		var p4 = t.getPixel(0,0);
+		//var p4 = t.getPixel(0,0);
 		//console.log('First point color:',p4);
-		t.lines.push([0, t.points.length -1, 'rgb(' + p4[0] + ',' + p4[1] + ',' + p4[2] + ')']);
-		args.callback(t);
+		//t.lines.push([0, t.points.length -1, 'rgb(' + p4[0] + ',' + p4[1] + ',' + p4[2] + ')']);
+		t.callback(t);
 		//console.log(t);
 	};
 	t.image.src = args.path;
@@ -94,6 +99,32 @@ NPos3d.Geom.PN3.prototype ={
 	getPixel:function(x,y){
 		var offset = this.getOffset(x,y);
 		return [this.data[offset],this.data[offset + 1],this.data[offset + 2],this.data[offset + 3]];
+	},
+	stringPad:function(string, numChars, padChar){
+		string = string.toString();
+		while(string.length < numChars){
+			string = padChar + string;
+		}
+		return string;
+	},
+	convertP4ToLine:function(p4){
+		var t = this;
+		console.log('---- p4:',p4);
+		var hex0 = parseInt(p4[0]).toString();
+		var hex1 = parseInt(p4[1]).toString();
+		var hex2 = parseInt(p4[2]).toString();
+		//console.log('hex0:',hex0,'hex1:',hex1,'hex2:',hex2);
+		var hex0 = t.stringPad(p4[0].toString(16),2,'0');
+		var hex1 = t.stringPad(p4[1].toString(16),2,'0');
+		var hex2 = t.stringPad(p4[2].toString(16),2,'0');
+		//console.log('hex0:',hex0,'hex1:',hex1,'hex2:',hex2);
+		var wholeString = hex0 + hex1 + hex2;
+		//console.log('wholeString:',wholeString);
+		var point0 = parseInt('0x' + wholeString.slice(0,3));
+		var point1 = parseInt('0x' + wholeString.slice(3));
+		var line = [point0,point1];
+		//console.log('line:',line);
+		return line;
 	}
 };
 
@@ -102,20 +133,10 @@ NPos3d.Geom.MeshToPng = function(args){
 	if(t===window){throw 'You must use the `new` keyword when calling a Constructor Method!';}
 	var args = args || {};
 
-	t.centerData = args.centerData || false;
-	t.scaleData = args.scaleData || false;
+	t.centerData = initVal(args.centerData, false);
+	t.scaleData = initVal(args.scaleData, true);
 
-	if(t.centerData){
-		var centerData = function(p3){return [ p3[0] + 128, p3[1] + 128, p3[2] + 128 ];}
-	}else{
-		var centerData = function(p3){return p3;}
-	}
 
-	if(t.scaleData){
-		var scaleData = function(p3){return [ Math.round(p3[0]*255), Math.round(p3[1]*255), Math.round(p3[2]*255) ];}
-	}else{
-		var scaleData = function(p3){return p3;}
-	}
 
 	t.canvas = document.createElement('canvas');
 	//t.canvas.style.display='block';
@@ -128,10 +149,61 @@ NPos3d.Geom.MeshToPng = function(args){
 	t.points = args.points || [];
 	t.lines = args.lines || [];
 	t.size = t.getSquarePower(t.points.length);
+	//t.size = t.getSquarePower(t.points.length + t.lines.length); //Broken until Color Gamma Shift on Transparent Pixels is addressed
 	t.canvas.width = t.size;
 	t.canvas.height = t.size;
 	t.imageData = t.c.getImageData(0,0,t.canvas.width,t.canvas.height);
-	t.data = t.imageData.data
+	t.data = t.imageData.data;
+
+	t.boundingBox = NPos3d.Scene.prototype.nGetBounds(t.points);
+	t.boundingLengths = {
+		x: t.boundingBox[1][0] - t.boundingBox[0][0],
+		y: t.boundingBox[1][1] - t.boundingBox[0][1],
+		z: t.boundingBox[1][2] - t.boundingBox[0][2],
+	};
+	t.centerScale = Math.max(
+		Math.abs(t.boundingBox[0][0]),
+		Math.abs(t.boundingBox[0][1]),
+		Math.abs(t.boundingBox[0][2]),
+		t.boundingBox[1][0],
+		t.boundingBox[1][1],
+		t.boundingBox[1][2]
+	);
+	t.boundingScale = Math.max(t.boundingLengths.x, t.boundingLengths.y, t.boundingLengths.z);
+	for(var key in t.boundingLengths){
+		if(t.boundingLengths[key] === t.boundingScale){
+			t.largestAxis = key;
+		}
+	}
+	t.halves = {
+		x: t.boundingLengths.x / 2,
+		y: t.boundingLengths.y / 2,
+		z: t.boundingLengths.z / 2
+	}
+	t.scaledHalves = {
+		x: t.boundingLengths.x / 2 / t.boundingScale,
+		y: t.boundingLengths.y / 2 / t.boundingScale,
+		z: t.boundingLengths.z / 2 / t.boundingScale
+	}
+	console.log('boundingBox:',t.boundingBox,'boundingScale:',t.boundingScale,'boundingLengths:',t.boundingLengths,'centerScale:',t.centerScale);
+
+	if(t.scaleData && t.centerData){
+		var processVertex = function(p3){
+			return t.scaleNormalizedVertexToColor(t.centerNormalizedData(t.normalizeVertexToBoundingScale(t.resetVertexOrigin(p3))));
+		}
+	}else if(t.scaleData && !t.centerData){
+		var processVertex = function(p3){
+			return t.scaleNormalizedVertexToColor(t.offsetNormalizedVertexOrigin(t.normalizeVertexToCenterScale(p3)));
+		}
+	}else if(!t.scaleData && t.centerData){
+		var processVertex = function(p3){
+			return t.roundVertexToColor(t.centerData(p3));
+		}
+	}else{ // No scaling, no centering - Assumes user passed in content based on a 255 unit cube starting at 0,0,0
+		var processVertex = function(p3){
+			return t.roundVertexToColor(p3);
+		}
+	}
 
 
 	//Because I want beautiful images, damnit.
@@ -139,12 +211,15 @@ NPos3d.Geom.MeshToPng = function(args){
 	//t.points.sort(t.sortPointsByLum);
 	//t.points.sort();
 
+	var y, x; //Positions of Pixels to store data in
+
+	//#### START STORING VERTEX DATA! ####
 	//I realize that this loop could be a little more performant, but you're not saving mesh to a PNG every frame.
 	var pointNum = 0;
-	for(var y = 0; y < t.size; y += 1){
-		for(var x = 0; x < t.size; x += 1){
+	for(y = 0; y < t.size && pointNum < t.points.length; y += 1){
+		for(x = 0; x < t.size && pointNum < t.points.length; x += 1){
 			if(pointNum < t.points.length){
-				var p3 = centerData(scaleData(t.points[pointNum]));
+				var p3 = processVertex(t.points[pointNum]);
 				var p4 = [p3[0],p3[1],p3[2],255];
 				//var p4 = [255,255,0,255];
 				t.setPixel(x,y,p4);
@@ -159,26 +234,161 @@ NPos3d.Geom.MeshToPng = function(args){
 			}
 			pointNum += 1;
 		}
+		if(pointNum > t.points.length){
+			break;
+		}
 	}
+	//#### END STORING VERTEX DATA! ####
+	
+	//#### START STORING LINE DATA! ####
+	//Broken until Color Gamma Shift on Transparent Pixels is addressed
+	/*
+	console.log('Starting Line storage!',t.size, y, x);
+	var lineNum = 0;
+	y -= 1;
+	while(y < t.size && lineNum < t.lines.length){
+		while(x < t.size && lineNum < t.lines.length){
+			if(lineNum < t.lines.length){
+				var p4 = t.convertLineToP4(t.lines[lineNum]);
+				t.setPixel(x,y,p4);
+			}else{
+				break;
+			}
+			lineNum += 1;
+			x += 1;
+		}
+		y += 1;
+	}
+	*/
+	//#### END STORING LINE DATA! ####
+	
 	t.c.putImageData(t.imageData,0,0);
-	t.image = new Image();
-	t.image.src=t.canvas.toDataURL();
-	t.image.style.display='block';
-	t.image.style.position='absolute';
-	t.image.style.top=0;
-	t.image.style.right='0px';
-	t.image.style.zIndex=9001;
-	//document.body.appendChild(t.canvas);
-	document.body.appendChild(t.image);
+	t.displayImage = initVal(args.displayImage,true);
+	if(t.displayImage){
+		t.image = new Image();
+		t.image.src=t.canvas.toDataURL();
+		t.image.style.display='block';
+		t.image.style.position='absolute';
+		t.image.style.bottom=0;
+		t.image.style.left=0;
+		t.image.style.zIndex=9001;
+		//document.body.appendChild(t.canvas);
+		document.body.appendChild(t.image);
+	}
 	//console.log(t);
 
-	var justAColor = t.getHslFromRgb([0,0,0]);
-	console.log('justAColor',justAColor);
-
+	//var justAColor = t.getHslFromRgb([0,0,0]);
+	//console.log('justAColor',justAColor);
+	console.log(t);
 	return t;
 };
 
 NPos3d.Geom.MeshToPng.prototype={
+	stringPad:NPos3d.Geom.PN3.prototype.stringPad,
+	convertLineToP4:function(line){
+		var t = this;
+		//4096 is the 12 bit barrier. Anything past there would only error.
+		console.log('---- line: ',line);
+		if(line[0] > 4095|| line[1] > 4095){throw 'Sorry, but the PN3 spec currently only has support for up to 4096 lines.';}
+		var point0 = line[0].toString(16);
+		var point1 = line[1].toString(16);
+		//console.log('point0:',point0,'point1:',point1);
+		point0 = t.stringPad(point0,3,'0');
+		point1 = t.stringPad(point1,3,'0');
+		//console.log('point0:',point0,'point1:',point1);
+		var wholeString = point0 + point1;
+		//console.log('wholeString:',wholeString);
+		var bin0 = wholeString.slice(0,2);
+		var bin1 = wholeString.slice(2,4);
+		var bin2 = wholeString.slice(4);
+		//console.log('bin0:',bin0,'bin1:',bin1,'bin2:',bin2);
+		bin0 = parseInt(bin0,16);
+		bin1 = parseInt(bin1,16);
+		bin2 = parseInt(bin2,16);
+		//console.log('bin0:',bin0,'bin1:',bin1,'bin2:',bin2);
+		var p4 = [bin0,bin1,bin2, 128];
+		console.log('p4:',p4);
+		return p4;
+	},
+	normalizeVertexToCenterScale:function(p3){
+		var t = this;
+		var output = [
+			(p3[0] / t.centerScale) /2,
+			(p3[1] / t.centerScale) /2,
+			(p3[2] / t.centerScale) /2
+		];
+		return output;
+	},
+	normalizeVertexToBoundingScale:function(p3){
+		var t = this;
+		return [
+			p3[0] / t.boundingScale,
+			p3[1] / t.boundingScale,
+			p3[2] / t.boundingScale
+		];
+	},
+	resetVertexOrigin:function(p3){
+		var t = this;
+		return [ //Put data origin at 0, all data becomes positive
+			p3[0] - t.boundingBox[0][0],
+			p3[1] - t.boundingBox[0][1],
+			p3[2] - t.boundingBox[0][2]
+		];
+	},
+	offsetNormalizedVertexOrigin:function(p3){
+		var t = this;
+		return [ //Put data origin at 0.5, all data becomes positive
+			p3[0] + 0.5,
+			p3[1] + 0.5,
+			p3[2] + 0.5
+		];
+	},
+	centerNormalizedData:function(p3){
+		var t = this;
+		//Vertex should be normalized before passing through here.
+		if(Math.max(Math.abs(p3[0]),Math.abs(p3[1]),Math.abs(p3[2])) > 1){throw 'Invalid Vertex. The centerNormalizedData function expects normalized input. (0 through 1)';}
+		//console.log('p3',p3);
+		var centered = [
+			p3[0] - t.scaledHalves.x,
+			p3[1] - t.scaledHalves.y,
+			p3[2] - t.scaledHalves.z
+		];
+		//console.log('centered',centered);
+		var offset = t.offsetNormalizedVertexOrigin(centered);
+		//console.log('offset',offset);
+		return offset;
+	},
+	centerData:function(p3){
+		var t = this;
+		//Vertex should be no more than 127 before passing through here.
+		if(Math.max(Math.abs(p3[0]),Math.abs(p3[1]),Math.abs(p3[2])) > 255){throw 'Invalid Vertex. The centerData function expects normalized input. (0 through 1)';}
+		//console.log('p3',p3);
+		var centered = [
+			p3[0] - t.halves.x + 127,
+			p3[1] - t.halves.y + 127,
+			p3[2] - t.halves.z + 127
+		];
+		return centered;
+	},
+	scaleNormalizedVertexToColor:function(p3){
+		var t = this;
+		//console.log(p3);
+		if( p3[0] > 1 || p3[0] < 0 || p3[1] > 1 || p3[1] < 0 || p3[2] > 1 || p3[2] < 0 ){throw 'Invalid Vertex. The scaleNormalizedVertexToColor function expects normalized input. (0 through 1)';}
+		return [ //Scale from (0 through 1) to (0 through 255) as an int
+			Math.round(p3[0]*255),
+			Math.round(p3[1]*255),
+			Math.round(p3[2]*255)
+		];
+	},
+	roundVertexToColor:function(p3){
+		var t = this;
+		return [ //Quantize (0 through 255) to an int
+			Math.round(p3[0]),
+			Math.round(p3[1]),
+			Math.round(p3[2])
+		];
+	},
+
 	getOffset:NPos3d.Geom.PN3.prototype.getOffset,
 	setPixel:NPos3d.Geom.PN3.prototype.setPixel,
 	getPixel:NPos3d.Geom.PN3.prototype.getPixel,

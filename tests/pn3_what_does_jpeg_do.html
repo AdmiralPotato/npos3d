@@ -51,19 +51,7 @@ s.add(myCube);
 
 
 var shapes = {};
-var justDoIt = function(string){
-	//console.log('Running!');
-	var bigString = objToShapeParser(string);
-	//console.log(bigString);
-	shapes = JSON.parse(bigString);
-	//console.log(shapes);
-	var shapeToUse = shapes.heart; //shapes.blockle
-	shapeToUse.centerData = true;
-	shapeToUse.scaleData = true;
-	var myPng = new n.Geom.MeshToPng(shapeToUse);
-	console.log(myPng);
-}
-justGiveMeData('pn3_test_shapes.obj',justDoIt);
+
 
 var myOb = new n.Ob3D({pos:lOffset.pos, rot:lOffset.rot, scale:[300,300,300],renderStyle:'points',pointStyle:'stroke',pointScale:2});
 s.add(myOb);
