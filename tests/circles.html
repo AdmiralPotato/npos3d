@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=100">
+<title>Testing some circle geometry</title>
+</head>
+<body>
+<script src="../src/core.js"></script>
+<script src="../src/font.js"></script>
+<script src="../src/geom.circle.js"></script>
+<script>
+
+var n = NPos3d;
+var scene = new n.Scene({frameRate:60});
+var s = scene;
+var c = s.c;
+var q = s.rQ;
+
+var scroll = 0;
+window.onmousewheel = function(e){scroll=e.wheelDelta;}; //Chrome
+window.addEventListener('DOMMouseScroll',function(e){scroll=e.detail;},false); //FireFox. Wut. You. Smokin.
+
+var userControl = {
+	pos:[0,0,0],
+	rot:[0,0,0],
+	update:function(){
+	//this.rot[0] += deg*1;
+	this.rot[1] = -deg*s.mpos.x /2;
+	this.rot[0] = deg*s.mpos.y /2;
+	scene.camera.pos[2] += (scroll/8);
+	scroll = 0;
+	//this.pos[0] = s.mpos.x;
+	//this.pos[1] = s.mpos.y;
+	}
+}
+s.add(userControl);
+
+
+var myCircleGeom = new n.Geom.Circle({
+	radius:200,
+	segments:3,
+	offset:0
+});
+var myOb = new n.Ob3D({
+	shape: myCircleGeom,
+	pos:userControl.pos,
+	rot:userControl.rot,
+	scale:[1,1,1]
+});
+myOb.counter = 0;
+myOb.update = function(){
+	var t = this;
+	t.counter += 1;
+	if(t.counter > 60){
+		t.counter = 0;
+		t.shape.segments += 1;
+		if(t.shape.segments > 16){t.shape.segments = 3;}
+		t.shape.formCircle();
+		t.lastRotString = false;
+	}
+	try{
+		t.render();
+	}
+	catch(error){
+		console.log(error);
+		console.log(t);
+		console.log(t.shape);
+		s.stop();
+	}
+}
+s.add(myOb);
+
+//var myText = new n.VText({string:'Loading Image...',textAlign:'center', pos:userControl.pos, rot:userControl.rot, scale:[8,8,8]});
+//s.add(myText);
+
+
+
+
+</script>
+</body>
+</html>

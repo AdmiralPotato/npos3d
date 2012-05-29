@@ -252,6 +252,9 @@ NPos3d.Scene.prototype={
 		//displayDebug(oldSize);
 		//displayDebug(document.body.style);
 	},
+	stop:function(){
+		clearInterval(this.interval);
+	},
 	sortByObjectZDepth:function(a,b){return a.pos[2] - b.pos[2];},
 //--------------------------------
 //This is where all of the 3D and math happens
