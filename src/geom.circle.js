@@ -2,13 +2,14 @@ NPos3d.Geom.Circle = function(args){
 	if(this === window){throw 'Please use the `new` keyword when using the `Circle` constructor.';}
 	var t = this;
 	var args = args || {};
-	t.color = args.color || '#fff';
+	t.color = args.color || undefined;
 	t.segments = args.segments || 12;
 	t.offset = args.offset || 0;
 	t.points = [];
 	t.lines = [];
 	t.radius = args.radius || 20;
 	t.formCircle();
+	return t;
 }
 
 NPos3d.Geom.Circle.prototype = {
