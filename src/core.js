@@ -198,9 +198,7 @@ NPos3d.Scene = function(args){
 
 		t.c.restore();
 	}
-
-	t.interval = setInterval(t.update,1000/t.frameRate);
-	
+	t.start();
 	t.globalize();
 	return this;
 }
@@ -253,6 +251,9 @@ NPos3d.Scene.prototype={
 		//displayDebug(oldSize);
 		//displayDebug(document.body.style);
 	},
+	start:function(){
+		this.interval = setInterval(this.update, 1000 / this.frameRate);
+	},
 	stop:function(){
 		clearInterval(this.interval);
 	},
@@ -269,9 +270,12 @@ NPos3d.Scene.prototype={
 		p2.color = p3[3] || false;
 		return p2;
 	},
-	getRelativeAngle3d:function(p3){ //DO NOT try to optomize out the use of sqrt in this function!!!
+	getVecLength2D:function(x,y){
+		return Math.sqrt(NPos3d.square(x) + NPos3d.square(y));
+	},
+	getRelativeAngle3D:function(p3){ //DO NOT try to optomize out the use of sqrt in this function!!!
 		var topAngle =  Math.atan2(p3[0], p3[1]);
-		var sideAngle = tau - Math.atan2(p3[2], Math.sqrt(NPos3d.square(p3[0]) + NPos3d.square(p3[1])));
+		var sideAngle = tau - Math.atan2(p3[2], this.getVecLength2D(p3[0],p3[1]));
 		return [sideAngle,0,-topAngle];
 	},
 	pointAt:function(o,endPos){
@@ -280,7 +284,7 @@ NPos3d.Scene.prototype={
 			endPos[1] - o.pos[1],
 			endPos[2] - o.pos[2]
 		];
-		o.rot = this.getRelativeAngle3d(posDiff);
+		o.rot = this.getRelativeAngle3D(posDiff);
 	},
 	rotatePoint:function(x,y,rad){
 		var length = Math.sqrt((x * x) + (y * y));
@@ -620,6 +624,7 @@ NPos3d.Scene.prototype={
 	add:function(o){
 		//I may rename this to addChild in the future. Hmm...
 		o.scene = this;
+		if(o.onAdd !== undefined){o.onAdd();}
 		this.rQ.push(o);
 	},
 	remove:function(o){
@@ -627,6 +632,7 @@ NPos3d.Scene.prototype={
 		for(var i = 0; i < t.rQ.length; i += 1){
 			if(t.rQ[i] === o){
 				t.rQ.splice(i,1);
+				if(o.onRemove !== undefined){o.onRemove();}
 				o.scene = false;
 				//I FOUND THE BLINKING FOR REAL THIS TIME!!!
 				//console.log(cro,i);
