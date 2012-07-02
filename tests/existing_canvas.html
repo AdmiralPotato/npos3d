@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Existing Canvas</title>
+<style>
+body{
+	background-color: #333;
+}
+#holder{
+	padding-top: 128px;
+	width: 100%;
+	background-color: #444;
+	text-align: center;
+}
+#lolcats{
+}
+</style>
+</head>
+<body>
+<div id="holder"><canvas id="lolcats" width="640" height="360"></canvas></div>
+<script src="../src/core.js"></script>
+<script src="../src/geom.sphere.js"></script>
+<script>
+
+var n = NPos3d;
+var s = new n.Scene({
+	fullScreen: false,
+	canvas: document.getElementById('lolcats')
+});
+
+var myCube = new n.Ob3D();
+myCube.update = function(s){
+	var t = this;
+	t.rot[0] += deg*1;
+	t.pos[0] = s.mpos.x;
+	t.pos[1] = s.mpos.y;
+	t.render();
+}
+s.add(myCube);
+
+var mySphereGeom = new n.Geom.Sphere({radius:100});
+var mySphere = new n.Ob3D({shape:mySphereGeom,pos:myCube.pos,rot:myCube.rot});
+s.add(mySphere);
+
+</script>
+</body>
+</html>

@@ -1,16 +1,3 @@
-//OKAY FORGET ALL OF THIS. IT DIDN'T WORK BECAUSE THE BROWSER TIMED OUT. I HATE IT NOW.
-/*
-//var bigString = 'lols';
-var justDoIt = function(string){
-	console.log('Running!');
-	var bigString = objToShapeParser(string);
-	//console.log(bigString);
-	var output = document.getElementById('output');
-	output.innerHTML = bigString;
-}
-justGiveMeData('subsurfed_6_times.obj',justDoIt);
-*/
-
 var timer = {
 	q:{},
 	start:function(string){
@@ -22,22 +9,25 @@ var timer = {
 		rec = this.q[string];
 		var now = new Date();
 		rec.start = now.getTime();
+		console.log('starting ' + string);
 	},
 	stop:function(string){
 		rec = this.q[string];
 		var now = new Date();
 		rec.stop = now.getTime();
 		rec.diff = rec.stop - rec.start;
-		console.log(string, rec.diff);
+		console.log('ending ' + string, rec.diff);
 	}
 };
+
+var operationCount = 50000;
 
 window.onload = function(){
 
 var arrayPointList = [];
 
 timer.start('Create array');
-for(var i = 0; i < 1000000; i+=1){
+for(var i = 0; i < operationCount; i+=1){
 	arrayPointList.push([
 		(Math.random() * 100),
 		(Math.random() * 100),
@@ -50,7 +40,7 @@ var obPointList = [];
 
 
 timer.start('Create object');
-for(var i = 0; i < 1000000; i+=1){
+for(var i = 0; i < operationCount; i+=1){
 	obPointList.push(new Vec3([
 		(Math.random() * 100),
 		(Math.random() * 100),
@@ -67,7 +57,7 @@ var getP3Scaled = function(p3,scale){
 
 timer.start('Scale array');
 var transformedArrayList = [];
-for(var i = 0; i < arrayPointList.length; i+=1){
+for(var i = 0; i < operationCount; i+=1){
 	transformedArrayList.push(getP3Scaled(arrayPointList[i],[
 		(Math.random() * 100),
 		(Math.random() * 100),
@@ -79,7 +69,7 @@ timer.stop('Scale array');
 
 timer.start('Scale object');
 var transformedObList = [];
-for(var i = 0; i < obPointList.length; i+=1){
+for(var i = 0; i < operationCount; i+=1){
 	transformedObList.push(obPointList[i].clone().mul([
 		(Math.random() * 100),
 		(Math.random() * 100),
@@ -143,7 +133,7 @@ var getP3Rotated = function(p3,rot,order){
 
 
 timer.start('Rotate array');
-for(var i = 0; i < transformedArrayList.length; i+=1){
+for(var i = 0; i < operationCount; i+=1){
 	transformedArrayList[i] = getP3Rotated(transformedArrayList[i],[
 		(Math.random() * 100),
 		(Math.random() * 100),
@@ -154,7 +144,7 @@ timer.stop('Rotate array');
 
 
 timer.start('Rotate object');
-for(var i = 0; i < transformedObList.length; i+=1){
+for(var i = 0; i < operationCount; i+=1){
 	transformedObList[i].rotate([
 		(Math.random() * 100),
 		(Math.random() * 100),
