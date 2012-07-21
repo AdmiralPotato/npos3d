@@ -123,6 +123,8 @@ NPos3d.Scene = function (args) {
 	t.camera = args.camera || new NPos3d.Camera();
 	t.frameRate = args.frameRate || 30;
 	t.pixelScale = args.pixelScale || 1;
+	t.globalCompositeOperation = args.globalCompositeOperation || 'source-over';
+	t.backgroundColor = args.backgroundColor || 'transparent';
 	t.lineWidth = args.lineWidth || undefined;
 	t.fullScreen = args.fullScreen === undefined || args.fullScreen === true ? true : false;
 	console.log(t.fullScreen);
@@ -132,6 +134,7 @@ NPos3d.Scene = function (args) {
 	t.canvasId = args.canvasId || 'canvas';
 	t.canvas = args.canvas || document.createElement('canvas');
 	t.canvas.id = t.canvasId;
+	t.c = t.canvas.getContext('2d');
 	if (args.canvas === undefined) {
 		document.body.appendChild(t.canvas);
 	}
@@ -164,6 +167,10 @@ NPos3d.Scene = function (args) {
 	if (t.pixelscale !== 1) {
 		t.canvas.style.imageRendering = '-moz-crisp-edges';
 		t.canvas.style.imageRendering = '-webkit-optimize-contrast';
+		//reference: http://stackoverflow.com/questions/10525107/html5-canvas-image-scaling-issue
+		t.c.imageSmoothingEnabled = false;
+		t.c.mozImageSmoothingEnabled = false;
+		t.c.webkitImageSmoothingEnabled = false;
 	}else if (!isMobile) {
 		t.canvas.style.position = 'fixed';
 	}
@@ -176,8 +183,7 @@ NPos3d.Scene = function (args) {
 	//t.canvas.style.width=  t.w + 'px';
 	//t.canvas.style.height= t.h + 'px';
 	t.canvas.style.backgroundColor = '#000';
-	t.c = t.canvas.getContext('2d');
-
+	t.cursorPosition = args.canvas !== undefined ? 'absolute' : 'relative';
 	t.mouseHandler = function (e) {
 		//console.dir(e);
 		//displayDebug(e.target);
@@ -193,13 +199,23 @@ NPos3d.Scene = function (args) {
 		if (e.touches && e.touches.length) {
 			//t.mpos.x = e.touches[0].screenX - t.cx;
 			//t.mpos.y = e.touches[0].screenY - t.cy;
-			t.mpos.x = Math.ceil(((e.touches[0].screenX - canvasOffset.x) / t.pixelScale) - t.cx);
-			t.mpos.y = Math.ceil(((e.touches[0].screenY - canvasOffset.y) / t.pixelScale) - t.cy);
+			if(t.cursorPosition === 'absolute'){
+				t.mpos.x = Math.ceil(((e.touches[0].screenX - canvasOffset.x) / t.pixelScale) - t.cx);
+				t.mpos.y = Math.ceil(((e.touches[0].screenY - canvasOffset.y) / t.pixelScale) - t.cy);
+			}else{
+				t.mpos.x = Math.ceil((e.touches[0].screenX / t.pixelScale) - t.cx);
+				t.mpos.y = Math.ceil((e.touches[0].screenY / t.pixelScale) - t.cy);
+			}
 		} else {
 			//t.mpos.x = e.pageX - t.cx;
 			//t.mpos.y = e.pageY - t.cy;
-			t.mpos.x = Math.ceil(((e.clientX - canvasOffset.x) / t.pixelScale) - t.cx);
-			t.mpos.y = Math.ceil(((e.clientY - canvasOffset.y) / t.pixelScale) - t.cy);
+			if(t.cursorPosition === 'absolute'){
+				t.mpos.x = Math.ceil(((e.clientX - canvasOffset.x) / t.pixelScale) - t.cx);
+				t.mpos.y = Math.ceil(((e.clientY - canvasOffset.y) / t.pixelScale) - t.cy);
+			}else{
+				t.mpos.x = Math.ceil((e.clientX / t.pixelScale) - t.cx);
+				t.mpos.y = Math.ceil((e.clientY / t.pixelScale) - t.cy);
+			}
 		}
 	}
 	window.addEventListener('mousemove',t.mouseHandler,false);
@@ -259,7 +275,9 @@ NPos3d.Scene.prototype = {
 		meta.setAttribute('content','width=' + t.w + ', user-scalable=0, target-densityDpi=device-dpi');
 		document.head.appendChild(meta);
 		document.body.style.height = t.h.toString() + 'px';
-		window.scrollTo(0,1);
+		if(t.isMobile){
+			window.scrollTo(0,1);
+		}
 		//window.scrollTo(0,0);
 		//displayDebug(oldSize);
 		//displayDebug(document.body.style);
@@ -293,7 +311,12 @@ NPos3d.Scene.prototype = {
 			displayDebug(newSize);
 		}
 
-		t.c.clearRect(0,0,t.w,t.h);
+		if(t.backgroundColor === 'transparent'){
+			t.c.clearRect(0,0,t.w,t.h);
+		}else{
+			t.c.fillStyle = t.backgroundColor;
+			t.c.fillRect(0,0,t.w,t.h);
+		}
 		t.c.save();
 		//c.strokeStyle = '#fff';
 		t.c.translate(t.cx, t.cy);
@@ -665,10 +688,10 @@ NPos3d.Scene.prototype = {
 					c.beginPath();
 					c.arc(p0.x,p0.y,(p0.scale * o.pointScale),0,tau,false);
 					if (o.pointStyle === 'fill') {
-						c.fillStyle= p0.color || o.shape.color || '#fff';
+						c.fillStyle= p0.color || o.shape.color || o.color || '#fff';
 						c.fill();
 					}else if (o.pointStyle === 'stroke') {
-						c.strokeStyle= p0.color || o.shape.color || '#fff';
+						c.strokeStyle= p0.color || o.shape.color || o.color || '#fff';
 						c.lineWidth= o.lineWidth || o.scene.lineWidth || 2;
 						c.lineCap='round';
 						c.stroke();
@@ -760,7 +783,7 @@ NPos3d.blessWith3DBase = function (o,args) {
 	o.transformedLineCache = [];
 	o.boundingBox = [[0,0,0],[0,0,0]];
 	o.shape = args.shape || o.shape;
-	o.color = args.color || undefined;
+	o.color = args.color || o.color ||undefined;
 	o.renderAlways = args.renderAlways || o.renderAlways || false;
 	o.renderStyle = args.renderStyle || o.renderStyle || 'lines';//points, both
 	o.pointScale = args.pointScale || o.pointScale || 2;

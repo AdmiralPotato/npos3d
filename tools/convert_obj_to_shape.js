@@ -77,7 +77,13 @@ var objToShapeParser = function(string,options){
 		//And just because I feel like it, I'm storing the intended color for the object in its name
 		//so example: greeCube-0f0_cubeMesh : turns into obRef = 'greeCube'; objectColor = '0f0';
 		if(mode === 'shape'){
-			var objectNameFromBlender = params[0].split('_')[0].split('-');
+			var geomsep = params[0].split('_');
+			if(geomsep.length > 2){
+				//Really important to note here: replace(/_/,'&&&') is only nailing the first underscore.
+				//replace(/_/g,'&&&') would nail all underscores.
+				geomsep = params[0].replace(/_/,'&&&').split('_');
+			}
+			var objectNameFromBlender = geomsep[0].replace('&&&','_').split('-');
 			var objectColor = objectNameFromBlender[1] || 'f00';
 		}else if(mode === 'font'){
 			//But fonts aren't usually multi-color, and '-' is a character, so no more color
