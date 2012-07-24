@@ -10,6 +10,7 @@ NPos3d.Geom.PN3 = function(args){
 	t.scaleData = args.scaleData || true;
 
 	t.id = args.id || 'PN3_default_canvas';
+	t.showCanvas = args.showCanvas || true;
 
 	if(t.centerData){
 		var centerData = function(p3){return [p3[0] -128,p3[1] -128,p3[2] -128];}
@@ -27,7 +28,7 @@ NPos3d.Geom.PN3 = function(args){
 		t.canvas = document.createElement('canvas');
 		t.canvas.id = t.id;
 	}
-	if(args.showCanvas){
+	if(t.showCanvas){
 		t.canvas.style.display='block';
 		t.canvas.style.position='fixed';
 		t.canvas.style.right='0px';

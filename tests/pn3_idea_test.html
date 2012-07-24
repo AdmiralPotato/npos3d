@@ -18,8 +18,14 @@ var c = s.c;
 var q = s.rQ;
 
 var scroll = 1;
-window.onmousewheel = function(e){scroll=e.wheelDelta;}; //Chrome
-window.addEventListener('DOMMouseScroll',function(e){scroll=e.detail;},false); //FireFox. Wut. You. Smokin.
+window.onmousewheel = function(e){
+	e.preventDefault();//OSX 10.7 bouncy scrolling, I loath you
+	scroll=e.wheelDelta;
+}; //Chrome
+window.addEventListener('DOMMouseScroll',function(e){
+	e.preventDefault();//OSX 10.7 bouncy scrolling, I loath you
+	scroll=e.detail;
+},false); //FireFox. Wut. You. Smokin.
 
 var imageList = 'adam.png,bw_grad.png,dexter.png,heart_sort.png,heart.png,hole_16.png,meg.png,noise_spectrum_16.png,noise_spectrum_32.png,png.png,spectrum_16.png,spectrum_24_hue.png,spectrum_24_luminosity.png,spectrum_24.png,spectrum_32.png,spectrum_128.png,spectrum_linear_128.png,sphere2.png,sphere3.png';
 imageList = imageList.split(',');

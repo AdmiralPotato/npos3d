@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Destroy</title>
+</head>
+<body>
+<script src="../src/core.js"></script>
+<script src="../src/fx.explosion.js"></script>
+<script>
+var n = NPos3d;
+var s = new n.Scene();
+
+var makeSelfDestructingCube = function(){
+	var myQube = new n.Ob3D({
+		pos:[
+			Math.random() * s.w - s.cx,
+			Math.random() * s.h - s.cy,
+			0
+		],
+		rot:[tau/8,tau/6,0]
+	});
+	myQube.life = Math.random() * 100;
+	myQube.update = function(){
+		var t = this;
+		t.rot[1] += (tau/100);
+		t.rot[2] += (tau/100);
+		t.render();
+		t.life -= 1;
+		if(t.life < 1){
+			n.Fx.Explosion({object:t});
+		}
+	}
+	s.add(myQube);
+}
+
+makeSelfDestructingCube();
+
+setInterval(makeSelfDestructingCube,1000);
+
+</script>
+</body>
+</html>

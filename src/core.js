@@ -521,7 +521,7 @@ NPos3d.Scene.prototype = {
 					c.moveTo(p0.x,p0.y);
 					c.lineTo(p1.x,p1.y);
 					c.strokeStyle= o.transformedLineCache[i][2] || o.shape.color || o.color || '#fff';
-					c.lineWidth= o.lineWidth || o.scene.lineWidth || 2;
+					c.lineWidth= o.lineWidth || o.scene.lineWidth || 1;
 					c.lineCap='round';
 					c.stroke();
 				}
@@ -692,7 +692,7 @@ NPos3d.Scene.prototype = {
 						c.fill();
 					}else if (o.pointStyle === 'stroke') {
 						c.strokeStyle= p0.color || o.shape.color || o.color || '#fff';
-						c.lineWidth= o.lineWidth || o.scene.lineWidth || 2;
+						c.lineWidth= o.lineWidth || o.scene.lineWidth || 1;
 						c.lineCap='round';
 						c.stroke();
 					}

@@ -18,8 +18,14 @@ var c = s.c;
 var q = s.rQ;
 
 var scroll = 1;
-window.onmousewheel = function(e){scroll=e.wheelDelta;}; //Chrome
-window.addEventListener('DOMMouseScroll',function(e){scroll=e.detail;},false); //FireFox. Wut. You. Smokin.
+window.onmousewheel = function(e){
+	e.preventDefault();//OSX 10.7 bouncy scrolling, I loath you
+	scroll=e.wheelDelta;
+}; //Chrome
+window.addEventListener('DOMMouseScroll',function(e){
+	e.preventDefault();//OSX 10.7 bouncy scrolling, I loath you
+	scroll=e.detail;
+},false); //FireFox. Wut. You. Smokin.
 
 var userControl = {
 	pos:[0,0,0],
