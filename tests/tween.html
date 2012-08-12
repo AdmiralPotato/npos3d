@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Tween</title>
+</head>
+<body>
+<script src="../src/core.js"></script>
+<script src="../src/utils.color.js"></script>
+<script src="../src/fx.tween.js"></script>
+<script>
+var n = NPos3d;
+var s = new n.Scene();
+
+var myCube = new n.Ob3D();
+
+s.add(myCube);
+
+var moveIt = function(){
+	new n.Fx.Tween({
+		object:myCube,
+		properties:{
+			pos:[
+				Math.random() * s.w - s.cx,
+				Math.random() * s.h - s.cy,
+				0
+			],
+			rot:[tau/Math.random(),tau/Math.random(),0]
+		},
+		frames: 100,
+		callback:moveIt
+	});
+}
+
+moveIt();
+
+</script>
+</body>
+</html>

@@ -1,0 +1,60 @@
+NPos3d.Fx = NPos3d.Fx || {};
+
+NPos3d.Fx.Tween = function(args){
+	var t = this;
+	if(t.__proto__ !== NPos3d.Fx.Tween.prototype){throw 'JIM TYPE ERROR';}
+	if(!args.object){
+		throw 'Fx.Tween requires an Object as the value for the `object` argument in the passed configuration object.';
+	}
+	if(!args.properties){
+		throw 'Fx.Tween requires an Object as the value for the `properties` argument in the passed configuration object.';
+	}
+	t.o = args.object;
+	t.properties = args.properties;
+	t.callback = args.callback || undefined;
+	t.method = args.method || t.transitionLinear;
+	t.frames = args.frames || 60;
+	t.frameState = 0;
+	t.initialValues = {};
+	t.pos = [0,0,0]; // required if the tween is to be in the scene's update queue
+	for(var p in t.properties){
+		if(t.properties.hasOwnProperty(p)){
+			var prop = t.properties[p];
+			if(prop.length !== undefined){ //if property is an array, clone it
+				t.initialValues[p] = t.o[p].slice(0);
+			}else{
+				t.initialValues[p] = t.o[p];
+			}
+		}
+	}
+	t.o.scene.add(this);
+	return t;
+}
+
+NPos3d.Fx.Tween.prototype = {
+	transitionLinear:function(n){return n;},
+	update:function(){
+		var t = this;
+		var frac = t.method(t.frameState / t.frames);
+		for(var p in t.properties){
+			if(t.properties.hasOwnProperty(p)){
+				var prop = t.properties[p];
+				var init = t.initialValues[p];
+				if(prop.length !== undefined){ //if property is an array, loop through it
+					for(var i = 0; i < prop.length; i += 1){
+						t.o[p][i] = init[i] + ((prop[i] - init[i]) * frac);
+					}
+				}else{
+					t.o[p] = init + ((prop - init) * frac);
+				}
+			}
+		}
+		t.frameState += 1;
+		if(t.frameState > t.frames){
+			if(t.callback !== undefined){
+				t.callback(t);
+			}
+			s.remove(t);
+		}
+	}
+};
