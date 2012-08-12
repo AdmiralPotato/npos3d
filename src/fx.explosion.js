@@ -3,6 +3,7 @@ NPos3d.Fx = NPos3d.Fx || {};
 NPos3d.Fx.Explosion = function(args){
 	var t = this;
 	if(t === window){throw 'JIM TYPE ERROR';}
+	if(NPos3d.Utils === undefined || NPos3d.Utils.Color === undefined){throw 'Please load the `NPos3d.Utils.Color` library prior to invoking the NPos3d.Fx.Explosion effects.';}
 	var args = args || {};
 	//NPos3d.blessWith3DBase(t,args);
 	if(!args.object || !args.object.transformedLineCache || !args.object.transformedPointCache){
@@ -14,13 +15,14 @@ NPos3d.Fx.Explosion = function(args){
 	t.children = [];
 	//console.log(t);
 	t.lines.forEach(function(line){
-		var p1 = t.points[line[0]];
-		var p2 = t.points[line[1]];
+		var p1 = t.points[line[0]],
+			p2 = t.points[line[1]],
+			color = t.o.color || t.o.shape.color || line[2] || t.o.scene.strokeStyle;
 		t.children.push(new NPos3d.Fx.ExplosionLine({
 			p1:p1,
 			p2:p2,
 			object:t.o,
-			color: t.o.color || t.o.shape.color || line[2] || false
+			colorArray: NPos3d.Utils.Color.colorStringToRGBAArray(color)
 		}));
 	});
 	t.o.destroy();
@@ -28,7 +30,7 @@ NPos3d.Fx.Explosion = function(args){
 };
 
 NPos3d.Fx.Explosion.prototype = {
-	
+
 };
 
 NPos3d.Fx.ExplosionLine = function(args){
@@ -47,9 +49,10 @@ NPos3d.Fx.ExplosionLine = function(args){
 	t.subVel(t.p2,t.midpoint);
 	t.shape.points = [t.p1,t.p2];
 	t.shape.lines = [[0,1]];
+	t.colorArray = args.colorArray;
 	t.vel = args.vel || [t.rint(2),t.rint(2),t.rint(2)];
 	t.rotVel = args.rotVel || [t.rneg(2) * deg,t.rneg(2) * deg,t.rneg(2) * deg];
-	t.lifespan = 50 + t.rint(50);
+	t.lifespan = 50 + t.rint(100);
 	t.life = t.lifespan;
 	t.o.scene.add(t);
 	return t;
@@ -86,9 +89,10 @@ NPos3d.Fx.ExplosionLine.prototype = {
 		o[2] -= v[2];
 	},
 	update:function(){
-		var t = this;
+		var t = this,ca = t.colorArray;
 		t.addVel(t.pos,t.vel);
 		t.addVel(t.rot,t.rotVel);
+		t.color = ['rgba(',ca[0],',',ca[1],',',ca[2],',',(ca[3] * (t.life / t.lifespan)),')'].join('');
 		t.render();
 		t.life -= 1;
 		if(t.life < 1){

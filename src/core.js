@@ -125,9 +125,10 @@ NPos3d.Scene = function (args) {
 	t.pixelScale = args.pixelScale || 1;
 	t.globalCompositeOperation = args.globalCompositeOperation || 'source-over';
 	t.backgroundColor = args.backgroundColor || 'transparent';
+	t.strokeStyle = args.strokeStyle || '#fff';
+	t.fillStyle = args.fillStyle || '#fff';
 	t.lineWidth = args.lineWidth || undefined;
 	t.fullScreen = args.fullScreen === undefined || args.fullScreen === true ? true : false;
-	console.log(t.fullScreen);
 
 	t.isMobile = (/iphone|ipad|ipod|android|blackberry|mini|windows\sce|palm/i.test(navigator.userAgent.toLowerCase()));
 
@@ -274,13 +275,11 @@ NPos3d.Scene.prototype = {
 		//var oldSize = subset(window,'innerHeight,innerWidth,outerWidth,outerHeight');
 		meta.setAttribute('content','width=' + t.w + ', user-scalable=0, target-densityDpi=device-dpi');
 		document.head.appendChild(meta);
-		document.body.style.height = t.h.toString() + 'px';
 		if(t.isMobile){
 			window.scrollTo(0,1);
 		}
 		//window.scrollTo(0,0);
 		//displayDebug(oldSize);
-		//displayDebug(document.body.style);
 	},
 	setInvertedCameraPos: function () {
 		//There is a really, really good reason to have this function.
@@ -306,7 +305,6 @@ NPos3d.Scene.prototype = {
 
 		if (t.debug) {
 			var newSize = subset(window,'innerHeight,innerWidth,outerWidth,outerHeight');
-			newSize.bodyHeight = document.body.style.height;
 			clearDebug();
 			displayDebug(newSize);
 		}
@@ -318,7 +316,6 @@ NPos3d.Scene.prototype = {
 			t.c.fillRect(0,0,t.w,t.h);
 		}
 		t.c.save();
-		//c.strokeStyle = '#fff';
 		t.c.translate(t.cx, t.cy);
 		t.rQ.sort(t.sortByObjectZDepth);
 
@@ -457,7 +454,7 @@ NPos3d.Scene.prototype = {
 			[bbMinOffset[0],bbMinOffset[1],bbMinOffset[2]],
 			[bbMaxOffset[0],bbMinOffset[1],bbMinOffset[2]],
 			[bbMaxOffset[0],bbMaxOffset[1],bbMinOffset[2]],
-			[bbMinOffset[0],bbMaxOffset[1],bbMinOffset[2]],
+			[bbMinOffset[0],bbMaxOffset[1],bbMinOffset[2]]
 		];
 	},
 	lineRenderLoop: function (o) {
@@ -500,15 +497,15 @@ NPos3d.Scene.prototype = {
 				p3a = t.getP3Offset(t.getP3Offset(t3a, o.pos), t.invertedCameraPos);
 				p3b = t.getP3Offset(t.getP3Offset(t3b, o.pos), t.invertedCameraPos);
 			}
-	
-	
+
+
 			//if the depths of the first and second point in the line are not behind the camera...
 			//and the depths of the first and second point in the line are closer than the far plane...
 			if (p3a[2] < t.camera.clipNear &&
 			   p3b[2] < t.camera.clipNear &&
 			   p3a[2] > t.camera.clipFar &&
 			   p3b[2] > t.camera.clipFar) {
-	
+
 				var p0 = t.project3Dto2D(p3a);
 				var p1 = t.project3Dto2D(p3b);
 				//                   min        max
@@ -520,7 +517,7 @@ NPos3d.Scene.prototype = {
 					c.beginPath();
 					c.moveTo(p0.x,p0.y);
 					c.lineTo(p1.x,p1.y);
-					c.strokeStyle= o.transformedLineCache[i][2] || o.shape.color || o.color || '#fff';
+					c.strokeStyle= o.transformedLineCache[i][2] || o.shape.color || o.color || t.strokeStyle;
 					c.lineWidth= o.lineWidth || o.scene.lineWidth || 1;
 					c.lineCap='round';
 					c.stroke();
@@ -575,15 +572,15 @@ NPos3d.Scene.prototype = {
 			o.lastScaleString = t.getP3String(o.scale);
 			o.lastRotString = t.getP3String(o.rot);
 		}
-	
+
 		if (o.renderAlways) {
 			t.lineRenderLoop(o);
 			return;
 		}
-	
+
 		var bbMinOffset = t.getP3Offset(t.getP3Offset(o.boundingBox[0], o.pos), t.invertedCameraPos);
 		var bbMaxOffset = t.getP3Offset(t.getP3Offset(o.boundingBox[1], o.pos), t.invertedCameraPos);
-	
+
 		//Checking to see if any part of the bounding box is in front on the camera and closer than the far plane before bothering to do anything else...
 		if (bbMaxOffset[2] > t.camera.clipFar && bbMinOffset[2] < t.camera.clipNear && bbMaxOffset[2] > t.camera.clipFar && bbMaxOffset[2] < t.camera.clipNear) {
 			//Alright. It's in front and not behind. Now is the bounding box even partially on screen?
@@ -631,15 +628,15 @@ NPos3d.Scene.prototype = {
 			o.lastScaleString = t.getP3String(o.scale);
 			o.lastRotString = t.getP3String(o.rot);
 		}
-	
+
 		if (o.renderAlways) {
 			t.pointRenderLoop(o);
 			return;
 		}
-	
+
 		var bbMinOffset = t.getP3Offset(t.getP3Offset(o.boundingBox[0], o.pos), t.invertedCameraPos);
 		var bbMaxOffset = t.getP3Offset(t.getP3Offset(o.boundingBox[1], o.pos), t.invertedCameraPos);
-	
+
 		//Checking to see if any part of the bounding box is in front on the camera and closer than the far plane before bothering to do anything else...
 		if (bbMaxOffset[2] > t.camera.clipFar && bbMinOffset[2] < t.camera.clipNear && bbMaxOffset[2] > t.camera.clipFar && bbMaxOffset[2] < t.camera.clipNear) {
 			//Alright. It's in front and not behind. Now is the bounding box even partially on screen?
@@ -688,10 +685,10 @@ NPos3d.Scene.prototype = {
 					c.beginPath();
 					c.arc(p0.x,p0.y,(p0.scale * o.pointScale),0,tau,false);
 					if (o.pointStyle === 'fill') {
-						c.fillStyle= p0.color || o.shape.color || o.color || '#fff';
+						c.fillStyle= p0.color || o.shape.color || o.color || t.fillStyle;
 						c.fill();
 					}else if (o.pointStyle === 'stroke') {
-						c.strokeStyle= p0.color || o.shape.color || o.color || '#fff';
+						c.strokeStyle= p0.color || o.shape.color || o.color || t.strokeStyle;
 						c.lineWidth= o.lineWidth || o.scene.lineWidth || 1;
 						c.lineCap='round';
 						c.stroke();
@@ -758,7 +755,6 @@ NPos3d.Geom = {};
 
 //The only reason this isn't with the rest of the shapes is because I need to use it inside the prototype of ob3D
 NPos3d.Geom.cube = {
-	color: '#999',
 	points: [
 		[ 10, 10, 10],
 		[ 10, 10,-10],
@@ -769,7 +765,7 @@ NPos3d.Geom.cube = {
 		[-10,-10, 10],
 		[-10,-10,-10]
 	],
-	lines: [[0,1],[2,3],[4,5],[6,7],[3,1],[2,0],[7,5],[6,4],[5,1],[7,3],[4,0],[6,2]],
+	lines: [[0,1],[2,3],[4,5],[6,7],[3,1],[2,0],[7,5],[6,4],[5,1],[7,3],[4,0],[6,2]]
 };
 
 NPos3d.blessWith3DBase = function (o,args) {

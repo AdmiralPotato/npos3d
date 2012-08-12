@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Destroy</title>
+	<style>
+		*{
+			font-family: monaco, monospace;
+			line-height: 16px;
+			font-size: 12px;
+			color: #9f0;
+			background-color: #000;
+		}
+		.error{
+			color: #f00;
+		}
+	</style>
+</head>
+<body>
+<script src="../src/core.js"></script>
+<script src="../src/utils.color.js"></script>
+<script>
+	var n = NPos3d, color = n.Utils.Color;
+	var div = document.createElement('pre');
+	document.body.appendChild(div);
+	var out = function(string){
+		div.innerHTML += string + '<br>';
+	};
+	var performTest = function(functionNameString, f, test, expectation){
+		out(functionNameString + '(' + test.toString() + ')');
+		var outcome = f(test);
+		if(outcome.toString() !== expectation.toString()){
+			out('<span class="error">Failure while testing ' + functionNameString + '(' + test.toString() + ')</span>');
+			out('Expected output was: ' + expectation.toString());
+			out('Resulted output was: <span class="error">' + outcome.toString() + '</span>');
+		}else{
+			out('Success. Output was: ' + expectation.toString());
+		}
+		out('');
+	};
+	var tests = [
+		['NPos3d.Utils.Color.colorStringToRGBAArray', color.colorStringToRGBAArray, '#fff', [255,255,255,1]],
+		['NPos3d.Utils.Color.colorStringToRGBAArray', color.colorStringToRGBAArray, '#12f', [17,34,255,1]],
+		['NPos3d.Utils.Color.colorStringToRGBAArray', color.colorStringToRGBAArray, 'rgb(255,0,255)', [255,0,255,1]],
+		['NPos3d.Utils.Color.colorStringToRGBAArray', color.colorStringToRGBAArray, 'rgba(255,0,255,0.2)', [255,0,255,0.2]],
+		['NPos3d.Utils.Color.colorStringToRGBAArray', color.colorStringToRGBAArray, 'hsl(180,100%,50%)', [0,255,255,1]],
+		['NPos3d.Utils.Color.colorStringToRGBAArray', color.colorStringToRGBAArray, 'hsla(180,100%,50%,0.5)', [0,255,255,0.5]],
+
+		['NPos3d.Utils.Color.colorStringToHSLAArray', color.colorStringToHSLAArray, '#fff', [0,0,100,1]],
+		['NPos3d.Utils.Color.colorStringToHSLAArray', color.colorStringToHSLAArray, '#0af', [200,100,50,1]],
+		['NPos3d.Utils.Color.colorStringToHSLAArray', color.colorStringToHSLAArray, 'rgb(255,0,255)', [300,100,50,1]],
+		['NPos3d.Utils.Color.colorStringToHSLAArray', color.colorStringToHSLAArray, 'rgba(255,0,255,0.2)', [300,100,50,0.2]],
+		['NPos3d.Utils.Color.colorStringToHSLAArray', color.colorStringToHSLAArray, 'hsl(180,100%,50%)', [180,100,50,1]],
+		['NPos3d.Utils.Color.colorStringToHSLAArray', color.colorStringToHSLAArray, 'hsla(180,100%,50%,0.5)', [180,100,50,0.5]]
+	];
+	tests.forEach(function(v){
+		performTest(v[0],v[1],v[2],v[3]);
+	});
+
+</script>
+</body>
+</html>
