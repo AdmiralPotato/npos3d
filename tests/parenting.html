@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Parenting</title>
+</head>
+<body>
+<script src="../src/core.js"></script>
+<script src="../src/font.js"></script>
+<script src="../src/geom.sphere.js"></script>
+<script src="../src/sprite.js"></script>
+<script>
+
+var n = NPos3d;
+var s = new n.Scene();
+
+var rotaryUpdate = function(s){
+	var t = this;
+	t.rot[2] += deg;
+	t.render();
+};
+
+var mySphereGeom = new n.Geom.Sphere({
+	radius:100,
+	segments:16,
+	rings:8,
+	order:'xyz'
+});
+var sun = new n.Ob3D({
+	shape: mySphereGeom,
+	rot: [deg * -45, 0, 0],
+	rotOrder: [2,0,1],
+	color: '#fd0'
+});
+sun.update = rotaryUpdate;
+s.add(sun);
+
+var erf = new n.Ob3D({
+	shape: mySphereGeom,
+	pos: [100,0,0],
+	scale: [0.25,0.25,0.25],
+	color: '#05f'
+});
+erf.update = rotaryUpdate;
+sun.add(erf);
+
+var moon = new n.Ob3D({
+	shape: mySphereGeom,
+	rot: [deg * -45, 0, 0],
+	rotOrder: [2,0,1],
+	scale: [0.5,0.5,0.5],
+	color: '#ffd'
+});
+moon.update = rotaryUpdate;
+erf.add(moon);
+
+
+//
+//var myText = new n.VText({
+//	string:'CATS!',
+//	scale:[10,10,0],
+//	textAlign:'center',
+//	pos:[100,0,0],
+//	color:'#09f'});
+//mySphere.add(myText);
+//
+//var mySprite = new n.Sprite3D({
+//	path:'../prelim_tests/sprites/megaman_heart_sprite_4x.png',
+//	numFrames:4,
+//	pos:[0,0,-10]
+//});
+//mySphere.add(mySprite);
+
+</script>
+</body>
+</html>

@@ -12,63 +12,41 @@
 <script>
 
 var n = NPos3d;
-var scene = new n.Scene();
-var s = scene;
-console.log(scene);
-var c = s.c;
-var q = s.rQ;
-
+var s = new n.Scene();
 
 var myCube = new n.Ob3D();
 myCube.update = function(s){
-	this.rot[0] += deg*1;
-	this.pos[0] = s.mpos.x;
-	this.pos[1] = s.mpos.y;
-	s.drawLines(this);
+	var t = this;
+	t.rot[0] += deg;
+	t.pos[0] = s.mpos.x;
+	t.pos[1] = s.mpos.y;
+	t.render();
 }
-
 s.add(myCube);
 
-
-var allCharsString = 'abcdefghijklmnopqrstuvwxyz\nABCDEFGHIJKLMNOPQRSTUVWXYZ\n1234567890-=!@#$%^&*()_+\n{}|\\~`:;"\'<>,.?/';
-
-var myFirstText = new n.VText({
-	pos:[0,-100,100],
-	//string:'Roses are red,\nViolets are blue,\nSugar is sweet,\nTHE GAME',
-	//string:'are roses red?\nare violets blue?\nis sugar sweet?\nall parse as true.',
-	string:allCharsString,
+var mySecondText = new n.VText({
+	string:'CATS!',
+	scale:[10,10,0],
 	textAlign:'center',
-	scale:[4,4,0],
-	renderAlways:true
+	pos:myCube.pos,
+	rot:myCube.rot,
+	color:'#09f'
 });
-myFirstText.up = myFirstText.update;
-myFirstText.inc1 = 0;
-myFirstText.inc2 = 0;
-myFirstText.update = function(s){
-	var t = this;
-	t.rot[1] += deg;
-	t.inc1 += 1;
-	t.inc2 += deg;
-	t.color = 'hsl(' + t.inc1 + ',100%,50%)';
-	//console.log(t.color);
-	//t.lastRotString = false;
-	//t.lineHeight = Math.sin(t.inc) * 15;
-	//t.string = (Math.round(t.inc2 * 100)).toString();
-	t.letterSpacing += Math.sin(t.inc2) * .05;
-	t.lineHeight += Math.cos(t.inc2) * .05;
-	t.up(s);
-}
-
-//s.add(myFirstText);
-
-var mySecondText = new n.VText({string:'CATS!',scale:[10,10,0],textAlign:'center',pos:myCube.pos,rot:myCube.rot,color:'#09f'});
 s.add(mySecondText);
 
 var mySphereGeom = new n.Geom.Sphere({radius:100});
-var mySphere = new n.Ob3D({shape:mySphereGeom,pos:myCube.pos,rot:myCube.rot});
+var mySphere = new n.Ob3D({
+	shape:mySphereGeom,
+	pos:myCube.pos,
+	rot:myCube.rot
+});
 s.add(mySphere);
 
-var mySprite = new n.Sprite3D({path:'../prelim_tests/sprites/megaman_heart_sprite_4x.png',numFrames:4,pos:[0,0,-10]});
+var mySprite = new n.Sprite3D({
+	path:'../prelim_tests/sprites/megaman_heart_sprite_4x.png',
+	numFrames:4,
+	pos:[0,0,-10]
+});
 s.add(mySprite);
 
 </script>

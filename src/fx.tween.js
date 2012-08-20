@@ -27,7 +27,7 @@ NPos3d.Fx.Tween = function(args){
 			}
 		}
 	}
-	t.o.scene.add(this);
+	t.o.add(this);
 	return t;
 }
 
@@ -54,7 +54,7 @@ NPos3d.Fx.Tween.prototype = {
 			if(t.callback !== undefined){
 				t.callback(t);
 			}
-			s.remove(t);
+			t.o.remove(t);
 		}
 	}
 };

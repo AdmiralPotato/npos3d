@@ -108,8 +108,57 @@ var NPos3d = NPos3d || {
 			return false;
 		}
 		return true;
+	},
+	addSceneToChildren: function aSTC(scene, children){
+		var len = children.length, i, o;
+		for (i = 0; i < len; i += 1) {
+			o = children[i];
+			o.scene = scene;
+			if(o.children !== undefined && o.children.length !== undefined && o.children.length > 0){
+				aSTC(scene, o.children);
+			}
+		}
+	},
+	addFunc: function (o) {
+		var t = this, len, i;
+		if(t.children === undefined){
+			t.children = [];
+		}else{
+			//It is never a good idea to allow an item to be a child of a parent more than once.
+			//Trust me.
+			len = t.children.length;
+			for (i = 0; i < len; i += 1) {
+				if (t.children[i] === o) {
+					return false;
+				}
+			}
+		}
+		if(o.parent){ //If the object already has a parent, remove it from that one first.
+			o.parent.remove(o);
+		}
+		if(t.childrenToBeAdded === undefined){
+			t.childrenToBeAdded = [];
+		}
+		t.childrenToBeAdded.push(o);
+		return true;
+	},
+	removeFunc: function (o) {
+		if (o.onRemove !== undefined) {
+			o.onRemove();
+		}
+		o.parent = false;
+		o.expired = true;
+		return false;
+	},
+	destroyFunc: function () {
+		var t = this;
+		if (t.parent) {
+			return t.parent.remove(t);
+		}
+		return false;
 	}
 };
+
 
 
 NPos3d.Scene = function (args) {
@@ -225,8 +274,7 @@ NPos3d.Scene = function (args) {
 	//window.addEventListener('touchend',t.mouseHandler,false);
 	//console.log(window.innerHeight, window.outerHeight);
 
-	t.rQ = [];//RenderQueue
-	t.cro = 0;//CurrentlyRenderingObject
+	t.children = [];
 
 	t.start();
 	t.globalize();
@@ -234,6 +282,7 @@ NPos3d.Scene = function (args) {
 };
 
 NPos3d.Scene.prototype = {
+	isScene: true,
 	globalize: function () {
 		//Because it's a pain to have to reference too much. I'll unpack my tools so I can get to work.
 		window.pi = NPos3d.pi;
@@ -297,33 +346,95 @@ NPos3d.Scene.prototype = {
 			-this.camera.pos[2]
 		];
 	},
+	updateRecursively: function uR(o,a,i){
+		var i, child;
+			if(!o.isScene){
+				o.update();
+			}
+		if(o.children !== undefined && o.children.length !== undefined && o.children.length > 0){
+			for (i = 0; i < o.children.length; i += 1) {
+				child = o.children[i];
+				uR(child, o);
+			}
+		}
+	},
+	removeExpiredChildrenRecursively: function rECR(o){
+		var len, i, child;
+		if(o.children !== undefined && o.children.length !== undefined && o.children.length > 0){
+			len = o.children.length;
+			for (i = len - 1; i >= 0; i -= 1) {
+				child = o.children[i];
+				rECR(child);
+				if(child.expired){
+					o.children.splice(i,1);
+					child.expired = false;
+					child.scene = false;
+				}
+			}
+		}
+	},
+	addNewChildrenRecursively: function aNCR(o){
+		var i, child, newChild, scene = false;
+		if(o.children !== undefined && o.children.length !== undefined && o.children.length > 0){
+			for (i = 0; i < o.children.length; i += 1) {
+				child = o.children[i];
+				aNCR(child);
+			}
+		}
+		if (o.isScene === true) {
+			scene = o;
+		} else {
+			scene = o.scene;
+		}
+		//This bit is nifty: thanks to scene = false at init,
+		//if a node is parented to another node with no scene,
+		//then all child nodes have their scene removed as well.
+		if(o.childrenToBeAdded !== undefined && o.childrenToBeAdded.length !== undefined && o.childrenToBeAdded.length > 0){
+			for (i = 0; i < o.childrenToBeAdded.length; i += 1) {
+				newChild = o.childrenToBeAdded[i];
+				newChild.expired = false;
+				o.children.push(newChild);
+				newChild.parent = o;
+				newChild.scene = scene;
+				if (newChild.onAdd !== undefined) {
+					newChild.onAdd();
+				}
+			}
+			delete o.childrenToBeAdded;
+		}
+	},
 	update: function () {
-		var t = this;
-		t.checkWindow();
-		if (t.w !== t.lw || t.h !== t.lh) {t.resize();}
-		t.setInvertedCameraPos();
+		try{
+			var t = this, i, len = t.children.length, child;
+			t.checkWindow();
+			if (t.w !== t.lw || t.h !== t.lh) {t.resize();}
+			t.setInvertedCameraPos();
 
-		if (t.debug) {
-			var newSize = subset(window,'innerHeight,innerWidth,outerWidth,outerHeight');
-			clearDebug();
-			displayDebug(newSize);
+			if (t.debug) {
+				var newSize = subset(window,'innerHeight,innerWidth,outerWidth,outerHeight');
+				clearDebug();
+				displayDebug(newSize);
+			}
+
+			if(t.backgroundColor === 'transparent'){
+				t.c.clearRect(0,0,t.w,t.h);
+			}else{
+				t.c.fillStyle = t.backgroundColor;
+				t.c.fillRect(0,0,t.w,t.h);
+			}
+			t.c.save();
+			t.c.translate(t.cx, t.cy);
+			t.children.sort(t.sortByObjectZDepth);
+
+			t.updateRecursively(t,'SCENE UPDATE!!!');
+			t.removeExpiredChildrenRecursively(t);
+			t.addNewChildrenRecursively(t);
+
+			t.c.restore();
+		} catch(e){
+			t.stop();
+			console.log(e, e.stack, t);
 		}
-
-		if(t.backgroundColor === 'transparent'){
-			t.c.clearRect(0,0,t.w,t.h);
-		}else{
-			t.c.fillStyle = t.backgroundColor;
-			t.c.fillRect(0,0,t.w,t.h);
-		}
-		t.c.save();
-		t.c.translate(t.cx, t.cy);
-		t.rQ.sort(t.sortByObjectZDepth);
-
-		for (t.cro = 0; t.cro < t.rQ.length; t.cro += 1) {
-			t.rQ[t.cro].update(t);
-		}
-
-		t.c.restore();
 	},
 	start: function () {
 		var t = this;
@@ -364,11 +475,11 @@ NPos3d.Scene.prototype = {
 		];
 		o.rot = this.getRelativeAngle3D(posDiff);
 	},
-	rotatePoint: function (x,y,rad) {
+	rotatePoint: function (x,y,rot) {
 		var length = Math.sqrt((x * x) + (y * y));
-		var currentRad = Math.atan2(x,y);
-		x = Math.sin(currentRad - rad) * length;
-		y = Math.cos(currentRad - rad) * length;
+		var currentRot = Math.atan2(x,y);
+		x = Math.sin(currentRot - rot) * length;
+		y = Math.cos(currentRot - rot) * length;
 		var output = [x,y];
 		return output;
 	},
@@ -377,7 +488,7 @@ NPos3d.Scene.prototype = {
 		//return p3;
 		var t = this, x = p3[0], y = p3[1], z = p3[2], xr = rot[0], yr = rot[1], zr = rot[2];
 		//Alright, here's something interesting.
-		//The order you rotate the dimentions is IMPORTANT to rotation animation!
+		//The order you rotate the dimensions is IMPORTANT to rotation animation!
 		//Here's my quick, no math approach to applying that.
 		for (var r = 0; r < order.length; r += 1) {
 			if (order[r] === 0) {
@@ -518,11 +629,19 @@ NPos3d.Scene.prototype = {
 					c.moveTo(p0.x,p0.y);
 					c.lineTo(p1.x,p1.y);
 					c.strokeStyle= o.transformedLineCache[i][2] || o.shape.color || o.color || t.strokeStyle;
-					c.lineWidth= o.lineWidth || o.scene.lineWidth || 1;
+					c.lineWidth= o.lineWidth || o.parent.lineWidth || 1;
 					c.lineCap='round';
 					c.stroke();
 				}
 			}
+		}
+	},
+	recurseForInheritedProperties:function rfip(o, propName){
+		if(o[propName] !== undefined){
+			return o[propName];
+		}
+		if(o.parent){
+			return rfip(o.parent, propName);
 		}
 	},
 	drawLines: function (o) {
@@ -697,45 +816,8 @@ NPos3d.Scene.prototype = {
 			}
 		}
 	},
-	add: function (o) { //I may rename this to addChild in the future. Hmm...
-		var t = this;
-		o.scene = this;
-		//It is a good idea to never allow an item to be in the render queue more than once.
-		//Trust me.
-		for (var i = 0; i < t.rQ.length; i += 1) {
-			if (t.rQ[i] === o) {
-				return false;
-			}
-		}
-		if (o.onAdd !== undefined) {o.onAdd();}
-		t.rQ.push(o);
-	},
-	remove: function (o) {
-		var t = this;
-		for (var i = 0; i < t.rQ.length; i += 1) {
-			if (t.rQ[i] === o) {
-				t.rQ.splice(i,1);
-				if (o.onRemove !== undefined) {o.onRemove();}
-				o.scene = false;
-				//I FOUND THE BLINKING FOR REAL THIS TIME!!!
-				//console.log(cro,i);
-				//If the object being removed from the render queue is positioned earlier than
-				//the object that's currently being rendered, subtract 1 from the 'render state'
-				//to compensate for the object being taken out, so on cro +=1 in the global
-				//'update' loop, we don't skip a beat for that same render pass. Oh yeah!
-				if (i <= t.cro ) {
-					t.cro -= 1;
-				}
-			}
-		}
-	}
-};
-
-NPos3d.destroyFunc = function () {
-	var t = this;
-	if (t.scene) {
-		t.scene.remove(t);
-	}
+	add: NPos3d.addFunc,
+	remove: NPos3d.removeFunc
 };
 
 NPos3d.Camera = function (args) {
@@ -802,6 +884,9 @@ NPos3d.blessWith3DBase = function (o,args) {
 	} else {
 		throw 'Invalid renderStyle specified: ' + o.renderStyle;
 	}
+	o.expired = false;
+	o.add = NPos3d.addFunc;
+	o.remove = NPos3d.removeFunc;
 	o.destroy = NPos3d.destroyFunc;
 };
 
@@ -815,7 +900,7 @@ NPos3d.Ob3D = function (args) {
 
 NPos3d.Ob3D.prototype = {
 	shape: NPos3d.Geom.cube,
-	update: function (s) {
+	update: function () {
 		this.render();
 	}
 };
