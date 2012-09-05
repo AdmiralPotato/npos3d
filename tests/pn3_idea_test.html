@@ -73,7 +73,7 @@ var justDoIt = function(string){
 }
 justGiveMeData('models/pn3_test_shapes.obj',justDoIt);
 
-var myOb = new n.Ob3D({pos:lOffset.pos, rot:lOffset.rot, scale:[300,300,300],renderStyle:'points',pointStyle:'stroke',pointScale:2});
+var myOb = new n.Ob3D({pos:lOffset.pos, rot:lOffset.rot, scale:[300,300,300],renderStyle:'points',pointStyle:'fill',pointScale:2});
 s.add(myOb);
 var myText = new n.VText({string:'Loading Image...',textAlign:'center', pos:lOffset.pos, rot:lOffset.rot, scale:[8,8,8]});
 s.add(myText);

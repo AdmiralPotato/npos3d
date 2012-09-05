@@ -15,16 +15,16 @@ var n = NPos3d;
 var s = new n.Scene();
 
 var myCube = new n.Ob3D();
-myCube.update = function(s){
+myCube.update = function(){
 	var t = this;
 	t.rot[0] += deg;
 	t.pos[0] = s.mpos.x;
 	t.pos[1] = s.mpos.y;
 	t.render();
-}
+};
 s.add(myCube);
 
-var mySecondText = new n.VText({
+var myText = new n.VText({
 	string:'CATS!',
 	scale:[10,10,0],
 	textAlign:'center',
@@ -32,7 +32,7 @@ var mySecondText = new n.VText({
 	rot:myCube.rot,
 	color:'#09f'
 });
-s.add(mySecondText);
+s.add(myText);
 
 var mySphereGeom = new n.Geom.Sphere({radius:100});
 var mySphere = new n.Ob3D({
@@ -45,7 +45,7 @@ s.add(mySphere);
 var mySprite = new n.Sprite3D({
 	path:'../prelim_tests/sprites/megaman_heart_sprite_4x.png',
 	numFrames:4,
-	pos:[0,0,-10]
+	pos: myCube.pos
 });
 s.add(mySprite);
 

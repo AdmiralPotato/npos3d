@@ -29,7 +29,7 @@ var s = new n.Scene({
 });
 
 var myCube = new n.Ob3D();
-myCube.update = function(s){
+myCube.update = function(){
 	var t = this;
 	t.rot[0] += deg*1;
 	t.pos[0] = s.mpos.x;

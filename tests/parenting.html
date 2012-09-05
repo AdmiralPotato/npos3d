@@ -11,7 +11,7 @@
 <script>
 
 var n = NPos3d;
-var s = new n.Scene();
+var s = new n.Scene({lineWidth: 2});
 
 var rotaryUpdate = function(s){
 	var t = this;
@@ -29,7 +29,9 @@ var sun = new n.Ob3D({
 	shape: mySphereGeom,
 	rot: [deg * -45, 0, 0],
 	rotOrder: [2,0,1],
-	color: '#fd0'
+	color: '#fd0',
+	renderStyle: 'both',
+	pointScale: 5
 });
 sun.update = rotaryUpdate;
 s.add(sun);

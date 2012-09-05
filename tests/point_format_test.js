@@ -20,7 +20,7 @@ var timer = {
 	}
 };
 
-var operationCount = 50000;
+var operationCount = 1000000;
 
 window.onload = function(){
 

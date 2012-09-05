@@ -275,6 +275,7 @@ NPos3d.Scene = function (args) {
 	//console.log(window.innerHeight, window.outerHeight);
 
 	t.children = [];
+	t.renderInstructionList = [];
 
 	t.start();
 	t.globalize();
@@ -403,6 +404,16 @@ NPos3d.Scene.prototype = {
 			delete o.childrenToBeAdded;
 		}
 	},
+	render: function(){
+		var t = this, i, len, instruction;
+		if(t.renderInstructionList !== undefined && t.renderInstructionList.length > 0){
+			len = t.renderInstructionList.length;
+			for(i = 0; i < len; i += 1){
+				instruction = t.renderInstructionList[i];
+				instruction.method(t.c,instruction.args);
+			}
+		}
+	},
 	update: function () {
 		try{
 			var t = this, i, len = t.children.length, child;
@@ -416,6 +427,11 @@ NPos3d.Scene.prototype = {
 				displayDebug(newSize);
 			}
 
+			t.renderInstructionList = []; //the render methods on each object are supposed to populate this array
+			t.updateRecursively(t,'SCENE UPDATE!!!');
+			t.addNewChildrenRecursively(t);
+			t.removeExpiredChildrenRecursively(t);
+
 			if(t.backgroundColor === 'transparent'){
 				t.c.clearRect(0,0,t.w,t.h);
 			}else{
@@ -424,12 +440,8 @@ NPos3d.Scene.prototype = {
 			}
 			t.c.save();
 			t.c.translate(t.cx, t.cy);
-			t.children.sort(t.sortByObjectZDepth);
-
-			t.updateRecursively(t,'SCENE UPDATE!!!');
-			t.removeExpiredChildrenRecursively(t);
-			t.addNewChildrenRecursively(t);
-
+			t.renderInstructionList.sort(t.sortRenderInstructionByZDepth);
+			t.render();
 			t.c.restore();
 		} catch(e){
 			t.stop();
@@ -443,7 +455,7 @@ NPos3d.Scene.prototype = {
 	stop: function () {
 		clearInterval(this.interval);
 	},
-	sortByObjectZDepth: function (a,b) {return a.pos[2] - b.pos[2];},
+	sortRenderInstructionByZDepth: function (a,b) {return a.z - b.z;},
 //--------------------------------
 //This is where all of the 3D and math happens
 //--------------------------------
@@ -568,28 +580,56 @@ NPos3d.Scene.prototype = {
 			[bbMinOffset[0],bbMaxOffset[1],bbMinOffset[2]]
 		];
 	},
+	recurseForInheritedProperties:function rfip(o, propName){
+		if(o[propName] !== undefined){
+			return o[propName];
+		}
+		if(o.parent){
+			return rfip(o.parent, propName);
+		}
+	},
+	drawLine: function(c,o){
+		c.beginPath();
+		c.moveTo(o.a.x,o.a.y);
+		c.lineTo(o.b.x,o.b.y);
+		c.strokeStyle = o.color;
+		c.lineWidth = o.lineWidth;
+		c.lineCap = 'round';
+		c.stroke();
+	},
+	drawCircle: function(c,o){
+		c.moveTo(o.pos.x, o.pos.y);
+		c.beginPath();
+		c.arc(o.pos.x,o.pos.y,(o.pos.scale * o.pointScale),0,tau,false);
+		if (o.pointStyle === 'fill') {
+			c.fillStyle = o.color;
+			c.fill();
+		}else if (o.pointStyle === 'stroke') {
+			c.strokeStyle = o.color;
+			c.lineWidth = o.lineWidth;
+			c.lineCap = 'round';
+			c.stroke();
+		}
+	},
 	lineRenderLoop: function (o) {
-		var t = this, c = t.c;
-		var computedPointList = [];
-		for (var i = 0; i < o.shape.points.length; i += 1) {
+		var t = this, c = t.c, computedPointList = [], i, p3a, p3b, t3a, t3b;
+		for (i = 0; i < o.shape.points.length; i += 1) {
 			//to make sure I'm not messing with the original array...
 			var point = [o.transformedPointCache[i][0],o.transformedPointCache[i][1],o.transformedPointCache[i][2]];
 			point = t.getP3Offset(point, o.pos);
 			point = t.getP3Offset(point, t.invertedCameraPos);
 			computedPointList[i] = point;
 		}
-		for (var i = 0; i < o.transformedLineCache.length; i += 1) {
+		for (i = 0; i < o.transformedLineCache.length; i += 1) {
 			//offset the points by the object's position
 			if (o.explosionFrame === undefined) {
-				var p3a = computedPointList[o.transformedLineCache[i][0]];
-				var p3b = computedPointList[o.transformedLineCache[i][1]];
+				p3a = computedPointList[o.transformedLineCache[i][0]];
+				p3b = computedPointList[o.transformedLineCache[i][1]];
 			} else {
 				//O great architect of all source that is far more elegant than that of my own,
 				//please forgive me for the sins that I am about to commit with my limited remaining brain power... (6 AM)
-				var t3a = o.transformedPointCache[o.transformedLineCache[i][0]];
-				var t3b = o.transformedPointCache[o.transformedLineCache[i][1]];
-				t3a = t.getP3Offset(t3a,[0,0,0]);
-				t3b = t.getP3Offset(t3b,[0,0,0]);
+				t3a = o.transformedPointCache[o.transformedLineCache[i][0]].slice();
+				t3b = o.transformedPointCache[o.transformedLineCache[i][1]].slice();
 				var lineCenter = [
 					t3a[0] + ((t3b[0] - t3a[0]) /2),
 					t3a[1] + ((t3b[1] - t3a[1]) /2),
@@ -625,23 +665,18 @@ NPos3d.Scene.prototype = {
 				var p1InBounds = NPos3d.pointIn2dBounds([p1.x,p1.y],screenBounds);
 				//If the line is completely off screen, do not bother rendering it.
 				if (p0InBounds || p1InBounds) {
-					c.beginPath();
-					c.moveTo(p0.x,p0.y);
-					c.lineTo(p1.x,p1.y);
-					c.strokeStyle= o.transformedLineCache[i][2] || o.shape.color || o.color || t.strokeStyle;
-					c.lineWidth= o.lineWidth || o.parent.lineWidth || 1;
-					c.lineCap='round';
-					c.stroke();
+					t.renderInstructionList.push({
+						method: t.drawLine,
+						args: {
+							a: p0,
+							b: p1,
+							color: o.transformedLineCache[i][2] || o.shape.color || o.color || t.strokeStyle,
+							lineWidth: o.lineWidth || o.parent.lineWidth || t.lineWidth || 1
+						},
+						z: Math.max(p3a[2], p3b[2])
+					});
 				}
 			}
-		}
-	},
-	recurseForInheritedProperties:function rfip(o, propName){
-		if(o[propName] !== undefined){
-			return o[propName];
-		}
-		if(o.parent){
-			return rfip(o.parent, propName);
 		}
 	},
 	drawLines: function (o) {
@@ -777,41 +812,45 @@ NPos3d.Scene.prototype = {
 		}
 	},
 	pointRenderLoop: function (o) {
-		var t = this, c = t.c;
-		var computedPointList = [];
-		for (var i = 0; i < o.shape.points.length; i += 1) {
+		var t = this, computedPointList = [], i, point, p3a, p0, screenBounds, circleArgs;
+		for (i = 0; i < o.shape.points.length; i += 1) {
 			//to make sure I'm not messing with the original array...
-			var point = [o.transformedPointCache[i][0],o.transformedPointCache[i][1],o.transformedPointCache[i][2]];
+			point = [o.transformedPointCache[i][0],o.transformedPointCache[i][1],o.transformedPointCache[i][2]];
 			point = t.getP3Offset(point, o.pos);
 			point = t.getP3Offset(point, t.invertedCameraPos);
 			point[3] = o.transformedPointCache[i][3] || false;//Point Color Preservation - no need to offset or rotate it
 			computedPointList[i] = point;
 		}
-		for (var i = 0; i < o.transformedPointCache.length; i += 1) {
+		for (i = 0; i < o.transformedPointCache.length; i += 1) {
 			//offset the points by the object's position
-			var p3a = computedPointList[i];
+			p3a = computedPointList[i];
 			//if the depth of the point is not behind the camera...
 			//and the depth of the point is closer than the far plane...
 			if (p3a[2] < t.camera.clipNear && p3a[2] > t.camera.clipFar) {
-				var p0 = t.project3Dto2D(p3a);
+				p0 = t.project3Dto2D(p3a);
 				//                   min        max
-				var screenBounds = [[-t.cx, -t.cy],[t.cx, t.cy]];
+				screenBounds = [[-t.cx, -t.cy],[t.cx, t.cy]];
 				var p0InBounds = NPos3d.pointIn2dBounds([p0.x,p0.y],screenBounds);
 				//If the line is completely off screen, do not bother rendering it.
 				if (p0InBounds) {
 					//console.log(p0.color);
-					c.moveTo(p0.x,p0.y);
-					c.beginPath();
-					c.arc(p0.x,p0.y,(p0.scale * o.pointScale),0,tau,false);
+					circleArgs = {
+						pos: p0,
+						pointScale: o.pointScale,
+						pointStyle: o.pointStyle
+					};
 					if (o.pointStyle === 'fill') {
-						c.fillStyle= p0.color || o.shape.color || o.color || t.fillStyle;
-						c.fill();
+						circleArgs.color = p0.color || o.shape.color || o.color || t.fillStyle;
 					}else if (o.pointStyle === 'stroke') {
-						c.strokeStyle= p0.color || o.shape.color || o.color || t.strokeStyle;
-						c.lineWidth= o.lineWidth || o.scene.lineWidth || 1;
-						c.lineCap='round';
-						c.stroke();
+						circleArgs.color = p0.color || o.shape.color || o.color || t.strokeStyle;
+						circleArgs.lineWidth = o.lineWidth || o.scene.lineWidth || 1;
 					}
+					t.renderInstructionList.push({
+						method: t.drawCircle,
+						args: circleArgs,
+						z: p3a[2]
+					});
+
 				}
 			}
 		}
