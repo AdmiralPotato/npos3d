@@ -11,10 +11,12 @@ NPos3d.Fx.Tween = function(args){
 	}
 	t.o = args.object;
 	t.properties = args.properties;
+	t.onUpdate = args.onUpdate || undefined;
 	t.callback = args.callback || undefined;
 	t.method = args.method || t.transitionLinear;
 	t.frames = args.frames || 60;
 	t.frameState = 0;
+	t.frac = 0;
 	t.initialValues = {};
 	t.pos = [0,0,0]; // required if the tween is to be in the scene's update queue
 	for(var p in t.properties){
@@ -35,19 +37,22 @@ NPos3d.Fx.Tween.prototype = {
 	transitionLinear:function(n){return n;},
 	update:function(){
 		var t = this;
-		var frac = t.method(t.frameState / t.frames);
+		t.frac = t.method(t.frameState / t.frames);
 		for(var p in t.properties){
 			if(t.properties.hasOwnProperty(p)){
 				var prop = t.properties[p];
 				var init = t.initialValues[p];
 				if(prop.length !== undefined){ //if property is an array, loop through it
 					for(var i = 0; i < prop.length; i += 1){
-						t.o[p][i] = init[i] + ((prop[i] - init[i]) * frac);
+						t.o[p][i] = init[i] + ((prop[i] - init[i]) * t.frac);
 					}
 				}else{
-					t.o[p] = init + ((prop - init) * frac);
+					t.o[p] = init + ((prop - init) * t.frac);
 				}
 			}
+		}
+		if(t.onUpdate !== undefined){
+			t.onUpdate(t);
 		}
 		t.frameState += 1;
 		if(t.frameState > t.frames){
