@@ -26,7 +26,7 @@ var initVal = function () { //A function designed to compensate for lack of func
 	return arguments[i];
 };
 
-var debug = false;
+var debug;
 var displayDebug = function (input) {
 	var output = [], keyName;
 	if (get_type(input).match(/Number/i)) {
@@ -59,66 +59,6 @@ var clearDebug = function () {
 };
 
 var NPos3d = NPos3d || {
-	pi: Math.PI,
-	tau: (Math.PI * 2),
-	deg: (Math.PI / 180),
-	sin: Math.sin,
-	cos: Math.cos,
-	square: function (num) {
-		return num * num;
-	},
-	//--------------------------------
-	//Some basic boundary / collission testing maths.
-	//--------------------------------
-	//I'm sure this function causes lag. Please use the 2D and 3D speciffic versions instead.
-	pointInNBounds: function (point, bounds) {
-		var d;
-		//Works for 2D, 3D, and nD! Please, please feed in bounds generated like the line below.
-		//var bounds = nGetBounds(pointList);
-		//d stands for dimention
-		for (d = 0; d < point.length; d += 1) {
-			//dimentional value check
-			if (point[d] < bounds[0][d] || point[d] > bounds[1][d]) {
-				return false;
-			}
-		}
-		return true;
-	},
-	pointIn2dBounds: function (point, bounds) {
-		//Works for 2D! Please, please feed in bounds generated like the line below.
-		//var bounds = nGetBounds(pointList);
-		//dimentional value check
-		if (
-			point[0] < bounds[0][0] || point[0] > bounds[1][0] ||
-			point[1] < bounds[0][1] || point[1] > bounds[1][1]
-		) {
-			return false;
-		}
-		return true;
-	},
-	pointIn3dBounds: function (point, bounds) {
-		//Works for 3D! Please, please feed in bounds generated like the line below.
-		//var bounds = nGetBounds(pointList);
-		//dimentional value check
-		if (
-			point[0] < bounds[0][0] || point[0] > bounds[1][0] ||
-			point[1] < bounds[0][1] || point[1] > bounds[1][1] ||
-			point[2] < bounds[0][2] || point[2] > bounds[1][2]
-		) {
-			return false;
-		}
-		return true;
-	},
-	addSceneToChildren: function aSTC(scene, children){
-		var len = children.length, i, o;
-		for (i = 0; i < len; i += 1) {
-			o = children[i];
-			o.scene = scene;
-			if(o.children !== undefined && o.children.length !== undefined && o.children.length > 0){
-				aSTC(scene, o.children);
-			}
-		}
-	},
 	addFunc: function (o) {
 		var t = this, len, i;
 		if(t.children === undefined){
@@ -156,13 +96,191 @@ var NPos3d = NPos3d || {
 			return t.parent.remove(t);
 		}
 		return false;
+	},
+	renderFunc: function(){
+		//This function should be assigned to objects in the scene which will be rendered;
+		//Example: myObject.render = NPos3d.renderFunc;
+		var t = this; //should be referring to the object being rendered
+		if (t.renderStyle === 'lines') {
+			t.scene.drawLines(t);
+		}else if (t.renderStyle === 'points') {
+			t.scene.drawPoints(t);
+		}else if (t.renderStyle === 'both') {
+			t.scene.drawLines(t);
+			t.scene.drawPoints(t);
+		} else {
+			throw 'Invalid renderStyle specified: ' + t.renderStyle;
+		}
+	}
+};
+
+//Here lies almost anything related to trig/calc
+NPos3d.Maths = {
+	pi: Math.PI,
+	tau: (Math.PI * 2),
+	deg: (Math.PI / 180),
+	sin: Math.sin,
+	cos: Math.cos,
+	square: function (num) {return num * num;},
+	//--------------------------------
+	//Some basic boundary / collission testing maths.
+	//--------------------------------
+	//I'm sure this function causes lag. Please use the 2D and 3D speciffic versions instead.
+	pointInNBounds: function (point, bounds) {
+		var d;
+		//Works for 2D, 3D, and nD! Please, please feed in bounds generated like the line below.
+		//var bounds = nGetBounds(pointList);
+		//d stands for dimention
+		for (d = 0; d < point.length; d += 1) {
+			//dimentional value check
+			if (point[d] < bounds[0][d] || point[d] > bounds[1][d]) {
+				return false;
+			}
+		}
+		return true;
+	},
+	pointIn2dBounds: function (point, bounds) {
+		//Works for 2D! Please, please feed in bounds generated like the line below.
+		//var bounds = nGetBounds(pointList);
+		//dimentional value check
+		if (
+			point[0] < bounds[0][0] || point[0] > bounds[1][0] ||
+				point[1] < bounds[0][1] || point[1] > bounds[1][1]
+			) {
+			return false;
+		}
+		return true;
+	},
+	pointIn3dBounds: function (point, bounds) {
+		//Works for 3D! Please, please feed in bounds generated like the line below.
+		//var bounds = nGetBounds(pointList);
+		//dimentional value check
+		if (
+			point[0] < bounds[0][0] || point[0] > bounds[1][0] ||
+				point[1] < bounds[0][1] || point[1] > bounds[1][1] ||
+				point[2] < bounds[0][2] || point[2] > bounds[1][2]
+			) {
+			return false;
+		}
+		return true;
+	},
+	//--------------------------------
+	//This is where all of the 3D and math happens
+	//--------------------------------
+	getVecLength2D: function (x,y) {
+		return Math.sqrt(NPos3d.Maths.square(x) + NPos3d.Maths.square(y));
+	},
+	getSquareVecLength2D: function (x,y) {
+		return NPos3d.Maths.square(x) + NPos3d.Maths.square(y);
+	},
+	getRelativeAngle3D: function (p3) { //DO NOT try to optomize out the use of sqrt in this function!!!
+		var topAngle =  Math.atan2(p3[0], p3[1]);
+		var sideAngle = tau - Math.atan2(p3[2], this.getVecLength2D(p3[0],p3[1]));
+		return [sideAngle,0,-topAngle];
+	},
+	p3Add: function (a,b) {
+		//an efficient hack to quickly add an offset to a 3D point
+		return [a[0]+b[0], a[1]+b[1], a[2]+b[2]];
+	},
+	p3Sub: function(a,b){
+		return [a[0]-b[0], a[1]-b[1], a[2]-b[2]];
+	},
+	pointAt: function (o,endPos) {
+		var m = NPos3d.Maths, posDiff = m.p3Sub(endPos, o.pos);
+		o.rot = m.getRelativeAngle3D(posDiff);
+	},
+	rotatePoint: function (x,y,rot) {
+		var length = Math.sqrt((x * x) + (y * y));
+		var currentRot = Math.atan2(x,y);
+		x = Math.sin(currentRot - rot) * length;
+		y = Math.cos(currentRot - rot) * length;
+		return [x,y];
+	},
+	totalRotationCalculations: 0,
+	p3Rotate: function (p3,rot,order) {
+		//return p3;
+		var m = NPos3d.Maths, x = p3[0], y = p3[1], z = p3[2], xr = rot[0], yr = rot[1], zr = rot[2];
+		//Alright, here's something interesting.
+		//The order you rotate the dimensions is IMPORTANT to rotation animation!
+		//Here's my quick, no math approach to applying that.
+		for (var r = 0; r < order.length; r += 1) {
+			if (order[r] === 0) {
+				//x...
+				if (xr !== 0) {
+					var zy = m.rotatePoint(z,y,xr);
+					z = zy[0];
+					y = zy[1];
+					m.totalRotationCalculations += 1;
+				}
+			}else if (order[r] === 1) {
+				//y...
+				if (yr !== 0) {
+					var xz = m.rotatePoint(x,z,yr);
+					x = xz[0];
+					z = xz[1];
+					m.totalRotationCalculations += 1;
+				}
+			}else if (order[r] === 2) {
+				//z...
+				if (zr !== 0) {
+					var xy = m.rotatePoint(x,y,zr);
+					x = xy[0];
+					y = xy[1];
+					m.totalRotationCalculations += 1;
+				}
+			} else {
+				throw 'up';
+			}
+		}
+		return [x,y,z];
+	},
+	getP3Scaled: function (p3,scale) {
+		//return p3;
+		return [p3[0]*scale[0], p3[1]*scale[1], p3[2]*scale[2]];;
+	},
+	getP2Offset: function (p2,offset) {
+		//an efficient hack to quickly add an offset to a 2D point
+		return [p2[0]+offset[0], p2[1]+offset[1]];
+	},
+	getP3String: function (p3) {
+		return 'x: '+p3[0]+' y: '+p3[1]+' z: '+p3[2];
+	},
+	nGetBounds: function (pointList) {
+		//Works for 2D, 3D, and nD!
+		var min = [];
+		var max = [];
+		var p = pointList[0];
+		for (var d = 0; d < p.length; d += 1) {
+			min[d] = p[d]; max[d] = p[d];
+		}
+		for (var i = 1; i < pointList.length; i += 1) {
+			var p = pointList[i];
+			//d stands for dimention
+			for (var d = 0; d < p.length; d += 1) {
+				if (p[d] < min[d]) {min[d] = p[d];}
+				else if (p[d] > max[d]) {max[d] = p[d];}
+			}
+		}
+		return [min,max];
+	},
+	makeBBCubeFromTwoPoints: function (bbMinOffset,bbMaxOffset) {
+		return [
+			[bbMinOffset[0],bbMinOffset[1],bbMaxOffset[2]],
+			[bbMaxOffset[0],bbMinOffset[1],bbMaxOffset[2]],
+			[bbMaxOffset[0],bbMaxOffset[1],bbMaxOffset[2]],
+			[bbMinOffset[0],bbMaxOffset[1],bbMaxOffset[2]],
+			[bbMinOffset[0],bbMinOffset[1],bbMinOffset[2]],
+			[bbMaxOffset[0],bbMinOffset[1],bbMinOffset[2]],
+			[bbMaxOffset[0],bbMaxOffset[1],bbMinOffset[2]],
+			[bbMinOffset[0],bbMaxOffset[1],bbMinOffset[2]]
+		];
 	}
 };
 
 
-
 NPos3d.Scene = function (args) {
-	var t = this, args = args || {};
+	var t = this;
+	args = args || {};
 	if (t === window) {
 		throw 'You must use the `new` keyword when calling a Constructor Method!';
 	}
@@ -182,6 +300,7 @@ NPos3d.Scene = function (args) {
 	t.isMobile = (/iphone|ipad|ipod|android|blackberry|mini|windows\sce|palm/i.test(navigator.userAgent.toLowerCase()));
 
 	t.canvasId = args.canvasId || 'canvas';
+	t.existingCanvas = args.canvas !== undefined;
 	t.canvas = args.canvas || document.createElement('canvas');
 	t.canvas.id = t.canvasId;
 	t.c = t.canvas.getContext('2d');
@@ -214,14 +333,15 @@ NPos3d.Scene = function (args) {
 		if (t.canvas.width == '') { t.canvas.width = args.width || 512; }
 		if (t.canvas.height == '') { t.canvas.height = args.height || 384; }
 	}
-	if (t.pixelscale !== 1) {
+	if (t.pixelScale !== 1) {
 		t.canvas.style.imageRendering = '-moz-crisp-edges';
 		t.canvas.style.imageRendering = '-webkit-optimize-contrast';
 		//reference: http://stackoverflow.com/questions/10525107/html5-canvas-image-scaling-issue
 		t.c.imageSmoothingEnabled = false;
 		t.c.mozImageSmoothingEnabled = false;
 		t.c.webkitImageSmoothingEnabled = false;
-	}else if (!isMobile) {
+	}
+	if (!t.isMobile && !t.existingCanvas) {
 		t.canvas.style.position = 'fixed';
 	}
 	//console.log(isMobile);
@@ -286,15 +406,15 @@ NPos3d.Scene.prototype = {
 	isScene: true,
 	globalize: function () {
 		//Because it's a pain to have to reference too much. I'll unpack my tools so I can get to work.
-		window.pi = NPos3d.pi;
-		window.tau = NPos3d.tau;
-		window.deg = NPos3d.deg;
-		window.sin = NPos3d.sin;
-		window.cos = NPos3d.cos;
-		window.square = NPos3d.square;
+		window.pi = NPos3d.Maths.pi;
+		window.tau = NPos3d.Maths.tau;
+		window.deg = NPos3d.Maths.deg;
+		window.sin = NPos3d.Maths.sin;
+		window.cos = NPos3d.Maths.cos;
+		window.square = NPos3d.Maths.square;
 	},
 	resize: function () {
-		var t = this;
+		var t = this, meta;
 		t.cx = Math.floor(t.w/2);
 		t.cy = Math.floor(t.h/2);
 		t.mpos.x = 0;
@@ -313,9 +433,9 @@ NPos3d.Scene.prototype = {
 		//	1: Make the canvas very, very large, which kills performance
 		//	2: Make the render output SUCK
 		//	3: HULK SMASH!!!
-		var meta = document.getElementById('vp');
+		meta = document.getElementById('vp');
 		if (!meta) {
-			var meta = document.createElement('meta');
+			meta = document.createElement('meta');
 			meta.setAttribute('name','viewport');
 			meta.setAttribute('id','vp');
 		}
@@ -334,7 +454,7 @@ NPos3d.Scene.prototype = {
 	setInvertedCameraPos: function () {
 		//There is a really, really good reason to have this function.
 		//If you add the position of the camera to all objects in the scene,
-		//they display offset in the direction -oposite- of where they would
+		//they display offset in the direction -opposite- of where they would
 		//had you moved a physical camera - so it is better to add negative
 		//camera position each frame. Also, if the rendering methods all use
 		//t.invertedCameraPos as it is defined at the start of each frame,
@@ -346,6 +466,15 @@ NPos3d.Scene.prototype = {
 			-this.camera.pos[1],
 			-this.camera.pos[2]
 		];
+	},
+	project3Dto2D: function (p3) {
+		//return {x: p3[0],y: p3[1]}; Orthographic!
+		var scale = this.camera.fov/(this.camera.fov + -p3[2]), p2 = {};
+		p2.x = (p3[0] * scale);
+		p2.y = (p3[1] * scale);
+		p2.scale = scale;
+		p2.color = p3[3] || false;
+		return p2;
 	},
 	updateRecursively: function uR(o,a,i){
 		var i, child;
@@ -456,130 +585,6 @@ NPos3d.Scene.prototype = {
 		clearInterval(this.interval);
 	},
 	sortRenderInstructionByZDepth: function (a,b) {return a.z - b.z;},
-//--------------------------------
-//This is where all of the 3D and math happens
-//--------------------------------
-	project3Dto2D: function (p3) {
-		//return {x: p3[0],y: p3[1]}; Orthographic!
-		var scale = this.camera.fov/(this.camera.fov + -p3[2]), p2 = {};
-		p2.x = (p3[0] * scale);
-		p2.y = (p3[1] * scale);
-		p2.scale = scale;
-		p2.color = p3[3] || false;
-		return p2;
-	},
-	getVecLength2D: function (x,y) {
-		return Math.sqrt(NPos3d.square(x) + NPos3d.square(y));
-	},
-	getSquareVecLength2D: function (x,y) {
-		return NPos3d.square(x) + NPos3d.square(y);
-	},
-	getRelativeAngle3D: function (p3) { //DO NOT try to optomize out the use of sqrt in this function!!!
-		var topAngle =  Math.atan2(p3[0], p3[1]);
-		var sideAngle = tau - Math.atan2(p3[2], this.getVecLength2D(p3[0],p3[1]));
-		return [sideAngle,0,-topAngle];
-	},
-	pointAt: function (o,endPos) {
-		var posDiff = [
-			endPos[0] - o.pos[0],
-			endPos[1] - o.pos[1],
-			endPos[2] - o.pos[2]
-		];
-		o.rot = this.getRelativeAngle3D(posDiff);
-	},
-	rotatePoint: function (x,y,rot) {
-		var length = Math.sqrt((x * x) + (y * y));
-		var currentRot = Math.atan2(x,y);
-		x = Math.sin(currentRot - rot) * length;
-		y = Math.cos(currentRot - rot) * length;
-		var output = [x,y];
-		return output;
-	},
-	totalRotationCalculations: 0,
-	getP3Rotated: function (p3,rot,order) {
-		//return p3;
-		var t = this, x = p3[0], y = p3[1], z = p3[2], xr = rot[0], yr = rot[1], zr = rot[2];
-		//Alright, here's something interesting.
-		//The order you rotate the dimensions is IMPORTANT to rotation animation!
-		//Here's my quick, no math approach to applying that.
-		for (var r = 0; r < order.length; r += 1) {
-			if (order[r] === 0) {
-				//x...
-				if (xr !== 0) {
-					var zy = t.rotatePoint(z,y,xr);
-					z = zy[0];
-					y = zy[1];
-					t.totalRotationCalculations += 1;
-				}
-			}else if (order[r] === 1) {
-				//y...
-				if (yr !== 0) {
-					var xz = t.rotatePoint(x,z,yr);
-					x = xz[0];
-					z = xz[1];
-					t.totalRotationCalculations += 1;
-				}
-			}else if (order[r] === 2) {
-				//z...
-				if (zr !== 0) {
-					var xy = t.rotatePoint(x,y,zr);
-					x = xy[0];
-					y = xy[1];
-					t.totalRotationCalculations += 1;
-				}
-			} else {
-				throw 'up';
-			}
-		}
-		return [x,y,z];
-	},
-	getP3Scaled: function (p3,scale) {
-		//return p3;
-		return [p3[0]*scale[0], p3[1]*scale[1], p3[2]*scale[2]];;
-	},
-	//I used to use a function in here named nGetOffsets that would do the same thing, looping through dimentions.
-	//It was TERRIBLY inefficient at this task, so I replaced it in favor of nDimention specific versions.
-	getP3Offset: function (p3,offset) {
-		//an efficient hack to quickly add an offset to a 3D point
-		return [p3[0]+offset[0], p3[1]+offset[1], p3[2]+offset[2]];
-	},
-	getP2Offset: function (p2,offset) {
-		//an efficient hack to quickly add an offset to a 2D point
-		return [p2[0]+offset[0], p2[1]+offset[1]];
-	},
-	getP3String: function (p3) {
-		return 'x: '+p3[0]+' y: '+p3[1]+' z: '+p3[2];
-	},
-	nGetBounds: function (pointList) {
-		//Works for 2D, 3D, and nD!
-		var min = [];
-		var max = [];
-		var p = pointList[0];
-		for (var d = 0; d < p.length; d += 1) {
-			min[d] = p[d]; max[d] = p[d];
-		}
-		for (var i = 1; i < pointList.length; i += 1) {
-			var p = pointList[i];
-			//d stands for dimention
-			for (var d = 0; d < p.length; d += 1) {
-				if (p[d] < min[d]) {min[d] = p[d];}
-				else if (p[d] > max[d]) {max[d] = p[d];}
-			}
-		}
-		return [min,max];
-	},
-	makeBBCubeFromTwoPoints: function (bbMinOffset,bbMaxOffset) {
-		return [
-			[bbMinOffset[0],bbMinOffset[1],bbMaxOffset[2]],
-			[bbMaxOffset[0],bbMinOffset[1],bbMaxOffset[2]],
-			[bbMaxOffset[0],bbMaxOffset[1],bbMaxOffset[2]],
-			[bbMinOffset[0],bbMaxOffset[1],bbMaxOffset[2]],
-			[bbMinOffset[0],bbMinOffset[1],bbMinOffset[2]],
-			[bbMaxOffset[0],bbMinOffset[1],bbMinOffset[2]],
-			[bbMaxOffset[0],bbMaxOffset[1],bbMinOffset[2]],
-			[bbMinOffset[0],bbMaxOffset[1],bbMinOffset[2]]
-		];
-	},
 	recurseForInheritedProperties:function rfip(o, propName){
 		if(o[propName] !== undefined){
 			return o[propName];
@@ -612,43 +617,18 @@ NPos3d.Scene.prototype = {
 		}
 	},
 	lineRenderLoop: function (o) {
-		var t = this, c = t.c, computedPointList = [], i, p3a, p3b, t3a, t3b;
+		var t = this, c = t.c, m = NPos3d.Maths, computedPointList = [], i, point, p3a, p3b, t3a, t3b;
 		for (i = 0; i < o.shape.points.length; i += 1) {
 			//to make sure I'm not messing with the original array...
-			var point = [o.transformedPointCache[i][0],o.transformedPointCache[i][1],o.transformedPointCache[i][2]];
-			point = t.getP3Offset(point, o.pos);
-			point = t.getP3Offset(point, t.invertedCameraPos);
+			point = [o.transformedPointCache[i][0],o.transformedPointCache[i][1],o.transformedPointCache[i][2]];
+			point = m.p3Add(point, o.pos);
+			point = m.p3Add(point, t.invertedCameraPos);
 			computedPointList[i] = point;
 		}
-		for (i = 0; i < o.transformedLineCache.length; i += 1) {
+		for (i = 0; i < o.shape.lines.length; i += 1) {
 			//offset the points by the object's position
-			if (o.explosionFrame === undefined) {
-				p3a = computedPointList[o.transformedLineCache[i][0]];
-				p3b = computedPointList[o.transformedLineCache[i][1]];
-			} else {
-				//O great architect of all source that is far more elegant than that of my own,
-				//please forgive me for the sins that I am about to commit with my limited remaining brain power... (6 AM)
-				t3a = o.transformedPointCache[o.transformedLineCache[i][0]].slice();
-				t3b = o.transformedPointCache[o.transformedLineCache[i][1]].slice();
-				var lineCenter = [
-					t3a[0] + ((t3b[0] - t3a[0]) /2),
-					t3a[1] + ((t3b[1] - t3a[1]) /2),
-					t3a[2] + ((t3b[2] - t3a[2]) /2)
-				];
-				var dir = Math.atan2( lineCenter[0], lineCenter[1]);
-				var ofs = [Math.sin(dir) * o.explosionFrame*2,Math.cos(dir) * o.explosionFrame*2];
-				//var ofs = [100,100];
-				//var ofs = [1,2];
-				t3a[0] = lineCenter[0] + ofs[0] + (Math.sin(o.explosionFrame*deg*10 + dir)*(t3a[0] - lineCenter[0]));
-				t3a[1] = lineCenter[1] + ofs[1] + (Math.cos(o.explosionFrame*deg*10 + dir)*(t3a[1] - lineCenter[1]));
-				t3b[0] = lineCenter[0] + ofs[0] + (Math.sin(o.explosionFrame*deg*10 + dir)*(t3b[0] - lineCenter[0]));
-				t3b[1] = lineCenter[1] + ofs[1] + (Math.cos(o.explosionFrame*deg*10 + dir)*(t3b[1] - lineCenter[1]));
-				t3a[2] = t3a[2] + (o.explosionFrame*2);
-				t3b[2] = t3b[2] + (o.explosionFrame*2);
-				p3a = t.getP3Offset(t.getP3Offset(t3a, o.pos), t.invertedCameraPos);
-				p3b = t.getP3Offset(t.getP3Offset(t3b, o.pos), t.invertedCameraPos);
-			}
-
+			p3a = computedPointList[o.shape.lines[i][0]];
+			p3b = computedPointList[o.shape.lines[i][1]];
 
 			//if the depths of the first and second point in the line are not behind the camera...
 			//and the depths of the first and second point in the line are closer than the far plane...
@@ -661,8 +641,8 @@ NPos3d.Scene.prototype = {
 				var p1 = t.project3Dto2D(p3b);
 				//                   min        max
 				var screenBounds = [[-t.cx, -t.cy],[t.cx, t.cy]];
-				var p0InBounds = NPos3d.pointIn2dBounds([p0.x,p0.y],screenBounds);
-				var p1InBounds = NPos3d.pointIn2dBounds([p1.x,p1.y],screenBounds);
+				var p0InBounds = m.pointIn2dBounds([p0.x,p0.y],screenBounds);
+				var p1InBounds = m.pointIn2dBounds([p1.x,p1.y],screenBounds);
 				//If the line is completely off screen, do not bother rendering it.
 				if (p0InBounds || p1InBounds) {
 					t.renderInstructionList.push({
@@ -670,7 +650,7 @@ NPos3d.Scene.prototype = {
 						args: {
 							a: p0,
 							b: p1,
-							color: o.transformedLineCache[i][2] || o.shape.color || o.color || t.strokeStyle,
+							color: o.shape.lines[i][2] || o.shape.color || o.color || t.strokeStyle,
 							lineWidth: o.lineWidth || o.parent.lineWidth || t.lineWidth || 1
 						},
 						z: Math.max(p3a[2], p3b[2])
@@ -680,51 +660,24 @@ NPos3d.Scene.prototype = {
 		}
 	},
 	drawLines: function (o) {
-		var t = this;
+		var t = this, m = NPos3d.Maths, i, point, line, bbCube, bbMinOffset, bbMaxOffset, bbOffScreen;
 		//I see no reason to check whether the rotation/scale is different between processing each point,
 		//so I'll just do that once per frame and have a loop just for rotating the points.
-		if (o.lastRotString !== t.getP3String(o.rot) || o.lastScaleString !== t.getP3String(o.scale)) {
+		if (o.lastRotString !== m.getP3String(o.rot) || o.lastScaleString !== m.getP3String(o.scale)) {
 			//console.log(o.lastRotString);
 			o.transformedPointCache = [];
-			for (var i = 0; i < o.shape.points.length; i += 1) {
+			for (i = 0; i < o.shape.points.length; i += 1) {
 				//to make sure I'm not messing with the original array...
-				var point = [o.shape.points[i][0],o.shape.points[i][1],o.shape.points[i][2]];
-				point = t.getP3Scaled(point, o.scale);
-				point = t.getP3Rotated(point, o.rot, o.rotOrder);
+				point = [o.shape.points[i][0],o.shape.points[i][1],o.shape.points[i][2]];
+				point = m.getP3Scaled(point, o.scale);
+				point = m.p3Rotate(point, o.rot, o.rotOrder);
 				point[3] = o.shape.points[i][3] || false;//Point Color Preservation - no need to offset or rotate it
 				o.transformedPointCache[i] = point;
 			}
 
-			//Now with Z-Depth sorting for each line on an object!
-			o.transformedLineCache = []; //Fixes a bug earlier where I -assumed- that transformedLineCache was already an array
-			for (var i = 0; i < o.shape.lines.length; i += 1) {
-				//to make sure I'm not messing with the original array...
-				if (o.shape.lines[i][2] !== undefined) {
-					var line = [o.shape.lines[i][0],o.shape.lines[i][1],o.shape.lines[i][2]];
-				} else {
-					var line = [o.shape.lines[i][0],o.shape.lines[i][1]];
-				}
-				o.transformedLineCache[i] = line;
-			}
-			//Fixing a nasty strange bug that happened if you sorted a one key array
-			if (o.transformedLineCache.length > 1) {
-				o.transformedLineCache.sort(function (a,b) {
-					var az = Math.min(
-						o.transformedPointCache[a[0]][2],
-						o.transformedPointCache[a[1]][2]
-					);
-					var bz = Math.min(
-						o.transformedPointCache[b[0]][2],
-						o.transformedPointCache[b[1]][2]
-					);
-					return az - bz;
-				});
-			}
-			//end z-sorting for the lines
-
-			o.boundingBox = t.nGetBounds(o.transformedPointCache);
-			o.lastScaleString = t.getP3String(o.scale);
-			o.lastRotString = t.getP3String(o.rot);
+			o.boundingBox = m.nGetBounds(o.transformedPointCache);
+			o.lastScaleString = m.getP3String(o.scale);
+			o.lastRotString = m.getP3String(o.rot);
 		}
 
 		if (o.renderAlways) {
@@ -732,55 +685,48 @@ NPos3d.Scene.prototype = {
 			return;
 		}
 
-		var bbMinOffset = t.getP3Offset(t.getP3Offset(o.boundingBox[0], o.pos), t.invertedCameraPos);
-		var bbMaxOffset = t.getP3Offset(t.getP3Offset(o.boundingBox[1], o.pos), t.invertedCameraPos);
+		bbMinOffset = m.p3Add(m.p3Add(o.boundingBox[0], o.pos), t.invertedCameraPos);
+		bbMaxOffset = m.p3Add(m.p3Add(o.boundingBox[1], o.pos), t.invertedCameraPos);
 
 		//Checking to see if any part of the bounding box is in front on the camera and closer than the far plane before bothering to do anything else...
 		if (bbMaxOffset[2] > t.camera.clipFar && bbMinOffset[2] < t.camera.clipNear && bbMaxOffset[2] > t.camera.clipFar && bbMaxOffset[2] < t.camera.clipNear) {
 			//Alright. It's in front and not behind. Now is the bounding box even partially on screen?
 			//8 points determine the cube... let's start from the top left, spiraling down clockwise
-			var bbCube = t.makeBBCubeFromTwoPoints(bbMinOffset,bbMaxOffset);
-			var bbOffscreen = true;
+			bbCube = m.makeBBCubeFromTwoPoints(bbMinOffset,bbMaxOffset);
+			bbOffScreen = true;
 			//At some point in the future if I wanted to get really crazy, I could probably determine which order
 			//to sort the array above to orient the point closest to the center of the screen nearest the first of the list,
 			//so I don't bother checking all 8 points to determine if it's on screen - or even off screen.
-			for (var i = 0; i < bbCube.length && bbOffscreen; i += 1) {
+			for (i = 0; i < bbCube.length && bbOffScreen; i += 1) {
 				bbp = t.project3Dto2D(bbCube[i]);
 				if (bbp.x < t.cx && bbp.x > -t.cx && bbp.y < t.cy && bbp.y > -t.cy) {
-					bbOffscreen = false;
+					bbOffScreen = false;
 				}
 			}
-			if (!bbOffscreen) {
+			if (!bbOffScreen) {
 				t.lineRenderLoop(o);
 			}
 		}
 	},
 	drawPoints: function (o) {
-		var t = this;
+		var t = this, m = NPos3d.Maths, i, point, bbMinOffset, bbMaxOffset, bbCube, bbOffScreen;
 		//I see no reason to check whether the rotation/scale is different between processing each point,
 		//so I'll just do that once per frame and have a loop just for rotating the points.
-		if (o.lastRotString !== t.getP3String(o.rot) || o.lastScaleString !== t.getP3String(o.scale)) {
+		if (o.lastRotString !== m.getP3String(o.rot) || o.lastScaleString !== m.getP3String(o.scale)) {
 			//console.log(o.lastRotString);
 			o.transformedPointCache = [];
-			for (var i = 0; i < o.shape.points.length; i += 1) {
+			for (i = 0; i < o.shape.points.length; i += 1) {
 				//to make sure I'm not messing with the original array...
-				var point = [o.shape.points[i][0],o.shape.points[i][1],o.shape.points[i][2]];
-				point = t.getP3Scaled(point, o.scale);
-				point = t.getP3Rotated(point, o.rot, o.rotOrder);
+				point = [o.shape.points[i][0],o.shape.points[i][1],o.shape.points[i][2]];
+				point = m.getP3Scaled(point, o.scale);
+				point = m.p3Rotate(point, o.rot, o.rotOrder);
 				point[3] = o.shape.points[i][3] || false;//Point Color Preservation - no need to offset or rotate it
 				o.transformedPointCache[i] = point;
 			}
-			//Now with Z-Depth sorting for each point on an object!
-			if (o.transformedPointCache.length > 1) {
-				o.transformedPointCache.sort(function (a,b) {
-					return a[2] - b[2];
-				});
-			}
-			//end z-sorting for the points
 
-			o.boundingBox = t.nGetBounds(o.transformedPointCache);
-			o.lastScaleString = t.getP3String(o.scale);
-			o.lastRotString = t.getP3String(o.rot);
+			o.boundingBox = m.nGetBounds(o.transformedPointCache);
+			o.lastScaleString = m.getP3String(o.scale);
+			o.lastRotString = m.getP3String(o.rot);
 		}
 
 		if (o.renderAlways) {
@@ -788,36 +734,36 @@ NPos3d.Scene.prototype = {
 			return;
 		}
 
-		var bbMinOffset = t.getP3Offset(t.getP3Offset(o.boundingBox[0], o.pos), t.invertedCameraPos);
-		var bbMaxOffset = t.getP3Offset(t.getP3Offset(o.boundingBox[1], o.pos), t.invertedCameraPos);
+		bbMinOffset = m.p3Add(m.p3Add(o.boundingBox[0], o.pos), t.invertedCameraPos);
+		bbMaxOffset = m.p3Add(m.p3Add(o.boundingBox[1], o.pos), t.invertedCameraPos);
 
 		//Checking to see if any part of the bounding box is in front on the camera and closer than the far plane before bothering to do anything else...
 		if (bbMaxOffset[2] > t.camera.clipFar && bbMinOffset[2] < t.camera.clipNear && bbMaxOffset[2] > t.camera.clipFar && bbMaxOffset[2] < t.camera.clipNear) {
 			//Alright. It's in front and not behind. Now is the bounding box even partially on screen?
 			//8 points determine the cube... let's start from the top left, spiraling down clockwise
-			var bbCube = t.makeBBCubeFromTwoPoints(bbMinOffset,bbMaxOffset);
-			var bbOffscreen = true;
+			bbCube = m.makeBBCubeFromTwoPoints(bbMinOffset,bbMaxOffset);
+			bbOffScreen = true;
 			//At some point in the future if I wanted to get really crazy, I could probably determine which order
 			//to sort the array above to orient the point closest to the center of the screen nearest the first of the list,
 			//so I don't bother checking all 8 points to determine if it's on screen - or even off screen.
-			for (var i = 0; i < bbCube.length && bbOffscreen; i += 1) {
+			for (i = 0; i < bbCube.length && bbOffScreen; i += 1) {
 				bbp = t.project3Dto2D(bbCube[i]);
 				if (bbp.x < t.cx && bbp.x > -t.cx && bbp.y < t.cy && bbp.y > -t.cy) {
-					bbOffscreen = false;
+					bbOffScreen = false;
 				}
 			}
-			if (!bbOffscreen) {
+			if (!bbOffScreen) {
 				t.pointRenderLoop(o);
 			}
 		}
 	},
 	pointRenderLoop: function (o) {
-		var t = this, computedPointList = [], i, point, p3a, p0, screenBounds, circleArgs;
+		var t = this, m = NPos3d.Maths, computedPointList = [], i, point, p3a, p0, screenBounds, circleArgs;
 		for (i = 0; i < o.shape.points.length; i += 1) {
 			//to make sure I'm not messing with the original array...
 			point = [o.transformedPointCache[i][0],o.transformedPointCache[i][1],o.transformedPointCache[i][2]];
-			point = t.getP3Offset(point, o.pos);
-			point = t.getP3Offset(point, t.invertedCameraPos);
+			point = m.p3Add(point, o.pos);
+			point = m.p3Add(point, t.invertedCameraPos);
 			point[3] = o.transformedPointCache[i][3] || false;//Point Color Preservation - no need to offset or rotate it
 			computedPointList[i] = point;
 		}
@@ -830,7 +776,7 @@ NPos3d.Scene.prototype = {
 				p0 = t.project3Dto2D(p3a);
 				//                   min        max
 				screenBounds = [[-t.cx, -t.cy],[t.cx, t.cy]];
-				var p0InBounds = NPos3d.pointIn2dBounds([p0.x,p0.y],screenBounds);
+				var p0InBounds = m.pointIn2dBounds([p0.x,p0.y],screenBounds);
 				//If the line is completely off screen, do not bother rendering it.
 				if (p0InBounds) {
 					//console.log(p0.color);
@@ -855,12 +801,14 @@ NPos3d.Scene.prototype = {
 			}
 		}
 	},
+
 	add: NPos3d.addFunc,
 	remove: NPos3d.removeFunc
 };
 
 NPos3d.Camera = function (args) {
-	var t = this, args = args || {};
+	var t = this;
+	args = args || {};
 	if (t===window) {
 		throw 'You must use the `new` keyword when calling a Constructor Method!';
 	}
@@ -897,7 +845,6 @@ NPos3d.blessWith3DBase = function (o,args) {
 	o.lastScaleString = false;
 	o.lastRotString = false;
 	o.transformedPointCache = [];
-	o.transformedLineCache = [];
 	o.boundingBox = [[0,0,0],[0,0,0]];
 	o.shape = args.shape || o.shape;
 	o.color = args.color || o.color ||undefined;
@@ -907,30 +854,16 @@ NPos3d.blessWith3DBase = function (o,args) {
 	o.pointStyle = args.pointStyle || o.pointStyle || 'fill';//stroke
 	o.lineWidth = args.lineWidth || undefined;
 	o.scene = false; //An object should know which scene it's in, if it would like to be destroyed.
-	if (o.renderStyle === 'lines') {
-		o.render = function () {
-			o.scene.drawLines(o);
-		}
-	}else if (o.renderStyle === 'points') {
-		o.render = function () {
-			o.scene.drawPoints(o);
-		}
-	}else if (o.renderStyle === 'both') {
-		o.render = function () {
-			o.scene.drawLines(o);
-			o.scene.drawPoints(o);
-		}
-	} else {
-		throw 'Invalid renderStyle specified: ' + o.renderStyle;
-	}
+
 	o.expired = false;
 	o.add = NPos3d.addFunc;
 	o.remove = NPos3d.removeFunc;
 	o.destroy = NPos3d.destroyFunc;
+	o.render = NPos3d.renderFunc;
 };
 
 NPos3d.Ob3D = function (args) {
-	var args = args || {};
+	args = args || {};
 	if (this === window) {throw 'You must use the `new` keyword when calling a Constructor Method!';}
 	if (arguments.length > 1) {throw 'ob3D expects only one param, an object with the named arguments.';}
 	NPos3d.blessWith3DBase(this,args);

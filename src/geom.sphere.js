@@ -1,6 +1,6 @@
 NPos3d.Geom.Sphere = function(args){
 	var o = {};//Output
-	var args = args || {};
+	args = args || {};
 	o.color = args.color || undefined;
 	o.points = [];
 	o.lines = [];
@@ -11,21 +11,22 @@ NPos3d.Geom.Sphere = function(args){
 	var rings = args.rings || 8;
 	var sliceWidth = pi / (rings -1);
 	var pointNum = 0;
+	var point = 0;
 	for(var ring = 0; ring < rings; ring += 1){
 		var z = (Math.cos(sliceWidth * ring) * (radius));
 		if(ring === 0 || ring === (rings -1)){
 			if     (o.order === 'xyz' || o.order === 'yxz'){o.points.push([0,0,z]);}
 			else if(o.order === 'xzy' || o.order === 'yzx'){o.points.push([0,z,0]);}
 			else if(o.order === 'zxy' || o.order === 'zyx'){o.points.push([z,0,0]);}
-			var pointNum = o.points.length - 1;
+			pointNum = o.points.length - 1;
 			if(ring === (rings -1)){
-				for(var point = 0; point < segments; point += 1){
+				for(point = 0; point < segments; point += 1){
 					o.lines.push([(pointNum - point -1),pointNum]); //,'#0f0'
 				}
 			}
 		}else{
 			var amp = Math.sin(sliceWidth * ring) * radius;
-			for(var point = 0; point < segments; point += 1){
+			for(point = 0; point < segments; point += 1){
 				var x = Math.sin(rad*point) * amp;
 				var y = Math.cos(rad*point) * amp;
 
@@ -35,7 +36,7 @@ NPos3d.Geom.Sphere = function(args){
 				else if(o.order === 'zxy'){o.points.push([z,x,y]);}
 				else if(o.order === 'yxz'){o.points.push([y,x,z]);}
 				else if(o.order === 'yzx'){o.points.push([y,z,x]);}
-				var pointNum = o.points.length - 1;
+				pointNum = o.points.length - 1;
 
 				//creates the line between this point and the last
 				if(pointNum < segments +1){

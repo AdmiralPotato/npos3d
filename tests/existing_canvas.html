@@ -17,7 +17,7 @@ body{
 </style>
 </head>
 <body>
-<div id="holder"><canvas id="lolcats" width="640" height="360"></canvas></div>
+<div id="holder"><canvas id="existing_canvas" width="640" height="360"></canvas></div>
 <script src="../src/core.js"></script>
 <script src="../src/geom.sphere.js"></script>
 <script>
@@ -25,13 +25,13 @@ body{
 var n = NPos3d;
 var s = new n.Scene({
 	fullScreen: false,
-	canvas: document.getElementById('lolcats')
+	canvas: document.getElementById('existing_canvas')
 });
 
 var myCube = new n.Ob3D();
 myCube.update = function(){
 	var t = this;
-	t.rot[0] += deg*1;
+	t.rot[0] += deg;
 	t.pos[0] = s.mpos.x;
 	t.pos[1] = s.mpos.y;
 	t.render();

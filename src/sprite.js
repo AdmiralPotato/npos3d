@@ -18,8 +18,7 @@ NPos3d.Scene.prototype.renderSprite = function(o){
 	var t = this,c = t.c;
 	if(o.loaded){
 		//offset the points by the object's position
-		var p3 = o.pos;
-		var p3 = t.getP3Offset(p3, t.camera.pos);
+		var p3 = NPos3d.Maths.p3Add(o.pos, t.camera.pos);
 		if( p3[2] < t.camera.clipNear && p3[2] > t.camera.clipFar ){
 			o.point2D = t.project3Dto2D(p3); //a convenience measure
 			//Just some basic positional culling... if it's not on screen, don't render it...

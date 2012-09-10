@@ -32,9 +32,9 @@ CurlyParticle.prototype = {
 	update:function(){
 		var t = this;
 		var oldPos = t.pos;
-		t.vel = s.getP3Rotated(t.vel,t.curl,[0,1,2]);
-		t.pos = s.getP3Offset(t.pos,t.vel);
-		s.pointAt(t,oldPos);
+		t.vel = n.Maths.p3Rotate(t.vel,t.curl,[0,1,2]);
+		t.pos = n.Maths.p3Add(t.pos,t.vel);
+		n.Maths.pointAt(t,oldPos);
 		this.render();
 		t.life -= 1;
 		t.color = 'rgba(255,0,0,' + (t.life / t.lifeTime) + ')';

@@ -21,8 +21,6 @@ var rotaryUpdate = function(s){
 
 var mySphereGeom = new n.Geom.Sphere({
 	radius:100,
-	segments:16,
-	rings:8,
 	order:'xyz'
 });
 var sun = new n.Ob3D({
@@ -38,7 +36,7 @@ s.add(sun);
 
 var erf = new n.Ob3D({
 	shape: mySphereGeom,
-	pos: [100,0,0],
+	pos: [200,0,0],
 	scale: [0.25,0.25,0.25],
 	color: '#05f'
 });

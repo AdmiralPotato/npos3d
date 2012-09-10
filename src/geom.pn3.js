@@ -78,7 +78,7 @@ NPos3d.Geom.PN3 = function(args){
 				}
 			}
 		}
-		
+
 		//var p4 = t.getPixel(0,0);
 		//console.log('First point color:',p4);
 		//t.lines.push([0, t.points.length -1, 'rgb(' + p4[0] + ',' + p4[1] + ',' + p4[2] + ')']);
@@ -156,11 +156,11 @@ NPos3d.Geom.MeshToPng = function(args){
 	t.imageData = t.c.getImageData(0,0,t.canvas.width,t.canvas.height);
 	t.data = t.imageData.data;
 
-	t.boundingBox = NPos3d.Scene.prototype.nGetBounds(t.points);
+	t.boundingBox = NPos3d.Maths.nGetBounds(t.points);
 	t.boundingLengths = {
 		x: t.boundingBox[1][0] - t.boundingBox[0][0],
 		y: t.boundingBox[1][1] - t.boundingBox[0][1],
-		z: t.boundingBox[1][2] - t.boundingBox[0][2],
+		z: t.boundingBox[1][2] - t.boundingBox[0][2]
 	};
 	t.centerScale = Math.max(
 		Math.abs(t.boundingBox[0][0]),
@@ -240,7 +240,7 @@ NPos3d.Geom.MeshToPng = function(args){
 		}
 	}
 	//#### END STORING VERTEX DATA! ####
-	
+
 	//#### START STORING LINE DATA! ####
 	//Broken until Color Gamma Shift on Transparent Pixels is addressed
 	/*
@@ -262,7 +262,7 @@ NPos3d.Geom.MeshToPng = function(args){
 	}
 	*/
 	//#### END STORING LINE DATA! ####
-	
+
 	t.c.putImageData(t.imageData,0,0);
 	t.displayImage = initVal(args.displayImage,true);
 	if(t.displayImage){

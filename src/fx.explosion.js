@@ -4,13 +4,13 @@ NPos3d.Fx.Explosion = function(args){
 	var t = this;
 	if(t === window){throw 'JIM TYPE ERROR';}
 	if(NPos3d.Utils === undefined || NPos3d.Utils.Color === undefined){throw 'Please load the `NPos3d.Utils.Color` library prior to invoking the NPos3d.Fx.Explosion effects.';}
-	var args = args || {};
+	args = args || {};
 	//NPos3d.blessWith3DBase(t,args);
-	if(!args.object || !args.object.transformedLineCache || !args.object.transformedPointCache){
+	if(!args.object || !args.object.shape.lines || !args.object.transformedPointCache){
 		throw 'Fx.Explosion requires an Ob3D as the value for the `object` argument in the passed configuration object.';
 	}
 	t.o = args.object;
-	t.lines = t.o.transformedLineCache;
+	t.lines = t.o.shape.lines;
 	t.points = t.o.transformedPointCache;
 	t.children = [];
 	//console.log(t);
