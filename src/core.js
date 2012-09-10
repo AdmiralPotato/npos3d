@@ -167,15 +167,15 @@ NPos3d.Maths = {
 	//--------------------------------
 	//This is where all of the 3D and math happens
 	//--------------------------------
-	getVecLength2D: function (x,y) {
-		return Math.sqrt(NPos3d.Maths.square(x) + NPos3d.Maths.square(y));
-	},
 	getSquareVecLength2D: function (x,y) {
 		return NPos3d.Maths.square(x) + NPos3d.Maths.square(y);
 	},
+	getVecLength2D: function (x,y) {
+		return Math.sqrt(NPos3d.Maths.getSquareVecLength2D(x,y));
+	},
 	getRelativeAngle3D: function (p3) { //DO NOT try to optomize out the use of sqrt in this function!!!
 		var topAngle =  Math.atan2(p3[0], p3[1]);
-		var sideAngle = tau - Math.atan2(p3[2], this.getVecLength2D(p3[0],p3[1]));
+		var sideAngle = tau - Math.atan2(p3[2], NPos3d.Maths.getVecLength2D(p3[0],p3[1]));
 		return [sideAngle,0,-topAngle];
 	},
 	p3Add: function (a,b) {
