@@ -55,7 +55,9 @@ var displayDebug = function (input) {
 	debug.innerHTML += output.join("\n");
 };
 var clearDebug = function () {
-	debug.innerHTML = '';
+	if(debug){
+		debug.innerHTML = '';
+	}
 };
 
 var NPos3d = NPos3d || {
@@ -298,6 +300,7 @@ NPos3d.Scene = function (args) {
 	t.fullScreen = args.fullScreen === undefined || args.fullScreen === true ? true : false;
 
 	t.isMobile = (/iphone|ipad|ipod|android|blackberry|mini|windows\sce|palm/i.test(navigator.userAgent.toLowerCase()));
+	t.useWindowSize = (/nexus\s7/i.test(navigator.userAgent.toLowerCase()));
 
 	t.canvasId = args.canvasId || 'canvas';
 	t.existingCanvas = args.canvas !== undefined;
@@ -315,10 +318,17 @@ NPos3d.Scene = function (args) {
 		t.canvas.style.left = 0;
 		t.canvas.style.zIndex = args.zIndex ||-10;
 		if (t.isMobile) {
-			t.checkWindow = function () {
-				t.w = Math.ceil(window.outerWidth / t.pixelScale);
-				t.h = Math.ceil(window.outerHeight / t.pixelScale);
-			};
+			if(t.useWindowSize){
+				t.checkWindow = function () {
+					t.w = Math.ceil(window.screen.width / t.pixelScale);
+					t.h = Math.ceil(window.screen.height / t.pixelScale);
+				};
+			} else {
+				t.checkWindow = function () {
+					t.w = Math.ceil(window.outerWidth / t.pixelScale);
+					t.h = Math.ceil(window.outerHeight / t.pixelScale);
+				};
+			}
 		} else {
 			t.checkWindow = function () {
 				t.w = Math.ceil(window.innerWidth / t.pixelScale);
@@ -552,6 +562,11 @@ NPos3d.Scene.prototype = {
 
 			if (t.debug) {
 				var newSize = subset(window,'innerHeight,innerWidth,outerWidth,outerHeight');
+				newSize.screenSizeWidth = window.screen.width;
+				newSize.screenSizeHeight = window.screen.height;
+				newSize.documentElementClientWidth = document.documentElement.clientWidth;
+				newSize.documentElementClientHeight = document.documentElement.clientHeight;
+				//newSize.navigator = navigator.userAgent;
 				clearDebug();
 				displayDebug(newSize);
 			}
