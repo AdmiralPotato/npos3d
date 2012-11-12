@@ -16,9 +16,9 @@ var rand = function(num){
 var delay = 0;
 
 var CurlyParticle = function(args){
-	if(this === window){throw 'Use the `new` operator when initiating constructors!';}
-	var args = args || {};
-	var t = this;
+	var t = this, type = 'CurlyParticle';
+	if(t.type !== type){throw 'You must use the `new` keyword when invoking the ' + type + ' constructor.';}
+	args = args || {};
 	n.blessWith3DBase(t, args);
 	t.vel = args.vel || [0,0,0];
 	t.curl = args.curl || [0,0,0];
@@ -26,8 +26,9 @@ var CurlyParticle = function(args){
 	t.lifeTime = t.life;
 	t.color = '#f00';
 	return this;
-}
+};
 CurlyParticle.prototype = {
+	type: 'CurlyParticle',
 	shape:{points:[[0,0,0],[0,10,0],[10,0,0],[0,0,10]],lines:[[0,1],[0,2],[0,3]]},
 	update:function(){
 		var t = this;
@@ -43,10 +44,10 @@ CurlyParticle.prototype = {
 			makeParticle();
 		}
 	}
-}
+};
 var pn = 1;
 var makeSymetricalSpiral = function(offset){
-	var offset = offset || 0;
+	offset = offset || 0;
 	if(pn === 1){pn = -1;}else{pn = 1;}
 	var myParticle = new CurlyParticle({
 		//vel:[rand(5),rand(5),rand(5)],
@@ -56,18 +57,17 @@ var makeSymetricalSpiral = function(offset){
 		curl:[(deg * s.mpos.x / 25),(deg * s.mpos.y / 25),0]
 	});
 	s.add(myParticle);
-}
+};
 
 
 var makeChaos = function(offset){
-	var offset = offset || 0;
 	if(pn === 1){pn = -1;}else{pn = 1;}
 	var myParticle = new CurlyParticle({
 		vel:[rand(5),rand(5),rand(5)],
 		curl:[rand(deg * 3),rand(deg * 3),rand(deg * 3)]
 	});
 	s.add(myParticle);
-}
+};
 
 var makeParticle = makeSymetricalSpiral;
 
@@ -78,7 +78,7 @@ document.body.onclick = function(e){
 	console.log(e);
 	functionState = (functionState + 1) % functionList.length;
 	makeParticle = functionList[functionState];
-}
+};
 //console.log(s.canvas);
 
 
@@ -86,5 +86,5 @@ for(var i = 0; i < 149; i += 1){
 	makeParticle(-i);
 }
 </script>
-</bdoy>
+</body>
 </html>

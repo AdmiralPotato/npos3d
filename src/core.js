@@ -281,11 +281,9 @@ NPos3d.Maths = {
 
 
 NPos3d.Scene = function (args) {
-	var t = this;
+	var t = this, type = 'Scene';
+	if(t.type !== type){throw 'You must use the `new` keyword when invoking the ' + type + ' constructor.';}
 	args = args || {};
-	if (t === window) {
-		throw 'You must use the `new` keyword when calling a Constructor Method!';
-	}
 
 	t.debug = args.debug || false;
 	t.mpos = {x: 0,y: 0};
@@ -413,6 +411,7 @@ NPos3d.Scene = function (args) {
 };
 
 NPos3d.Scene.prototype = {
+	type: 'Scene',
 	isScene: true,
 	globalize: function () {
 		//Because it's a pain to have to reference too much. I'll unpack my tools so I can get to work.
@@ -486,15 +485,15 @@ NPos3d.Scene.prototype = {
 		p2.color = p3[3] || false;
 		return p2;
 	},
-	updateRecursively: function uR(o,a,i){
+	updateRecursively: function updateRecursively(o){
 		var i, child;
-			if(!o.isScene){
-				o.update();
-			}
+		if(!o.isScene){
+			o.update();
+		}
 		if(o.children !== undefined && o.children.length !== undefined && o.children.length > 0){
 			for (i = 0; i < o.children.length; i += 1) {
 				child = o.children[i];
-				uR(child, o);
+				updateRecursively(child);
 			}
 		}
 	},
@@ -513,12 +512,12 @@ NPos3d.Scene.prototype = {
 			}
 		}
 	},
-	addNewChildrenRecursively: function aNCR(o){
+	addNewChildrenRecursively: function addNewChildrenRecursively(o){
 		var i, child, newChild, scene = false;
 		if(o.children !== undefined && o.children.length !== undefined && o.children.length > 0){
 			for (i = 0; i < o.children.length; i += 1) {
 				child = o.children[i];
-				aNCR(child);
+				addNewChildrenRecursively(child);
 			}
 		}
 		if (o.isScene === true) {
@@ -822,17 +821,18 @@ NPos3d.Scene.prototype = {
 };
 
 NPos3d.Camera = function (args) {
-	var t = this;
+	var t = this, type = 'Camera';
+	if(t.type !== type){throw 'You must use the `new` keyword when invoking the ' + type + ' constructor.';}
 	args = args || {};
-	if (t===window) {
-		throw 'You must use the `new` keyword when calling a Constructor Method!';
-	}
 	//Field Of View; Important!
 	t.fov = args.fov || 550;
 	t.clipNear = args.clipNear || t.fov; //This line is also VERY important! Never have the clipNear less than the FOV!
 	t.clipFar = args.clipFar || -1000;
 	t.pos = args.pos || [0,0,0];
 	t.rot = args.rot || [0,0,0];//Totally not implemented yet.
+};
+NPos3d.Camera.prototype = {
+	type: 'Camera'
 };
 
 NPos3d.Geom = {};
@@ -878,14 +878,16 @@ NPos3d.blessWith3DBase = function (o,args) {
 };
 
 NPos3d.Ob3D = function (args) {
+	var t = this, type = 'Ob3D';
+	if(t.type !== type){throw 'You must use the `new` keyword when invoking the ' + type + ' constructor.';}
 	args = args || {};
-	if (this === window) {throw 'You must use the `new` keyword when calling a Constructor Method!';}
-	if (arguments.length > 1) {throw 'ob3D expects only one param, an object with the named arguments.';}
-	NPos3d.blessWith3DBase(this,args);
+	if (arguments.length > 1) {throw 'Ob3D expects only one argument, an object with the named configuration values.';}
+	NPos3d.blessWith3DBase(t,args);
 	return this;
 };
 
 NPos3d.Ob3D.prototype = {
+	type: 'Ob3D',
 	shape: NPos3d.Geom.cube,
 	update: function () {
 		this.render();

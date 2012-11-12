@@ -11,11 +11,11 @@ var s = new n.Scene({frameRate:40});
 var q = s.rQ;
 var rand = function(num){
 	return (Math.random() * (num * 2)) - num;
-}
+};
 var Particle = function(args){
-	if(this === window){throw 'You must access the Particle cinstructor method using the `new` keyword.'}
-	var t = this;
-	var args = args || {};
+	var t = this, type = 'Particle';
+	if(t.type !== type){throw 'You must use the `new` keyword when invoking the ' + type + ' constructor.';}
+	args = args || {};
 	n.blessWith3DBase(t,args);
 	t.vel = args.vel || [0,0,0];
 	t.life = args.life || 200;
@@ -23,8 +23,9 @@ var Particle = function(args){
 	t.rotSpeed = args.rotSpeet || rand(1);
 	t.shape = {points:[[20,0,0,'hsl(90,100%,50%)'],[0,0,0,'hsl(45,100%,50%)']],lines:[[0,1,'#555']]};
 	return t;
-}
+};
 Particle.prototype = {
+	type: 'Particle',
 	renderStyle:'both',
 	pointStyle:'fill',
 	pointScale:3,
@@ -70,5 +71,5 @@ for(var i = 0; i < 100; i += 1){
 	makeParticle();
 }
 </script>
-</bdoy>
+</body>
 </html>

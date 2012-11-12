@@ -13,7 +13,7 @@ NPos3d.Scene.prototype.drawSprite = function(c,o){
 		c.drawImage(o.image, o.offset.x, o.offset.y);
 	}
 	c.restore();
-}
+};
 NPos3d.Scene.prototype.renderSprite = function(o){
 	var t = this,c = t.c;
 	if(o.loaded){
@@ -34,7 +34,7 @@ NPos3d.Scene.prototype.renderSprite = function(o){
 			}
 		}
 	}
-}
+};
 
 
 NPos3d.blessWithSpriteBase = function(o,config){
@@ -62,16 +62,17 @@ NPos3d.blessWithSpriteBase = function(o,config){
 	o.render = config.render || o.render;
 	o.image.src = config.path;
 	return o;
-}
+};
 
 NPos3d.Sprite3D = function(config){
-	if(this === window){throw 'JIM TYPE ERROR'};
-	var t = this;
+	var t = this, type = 'Sprite3D';
+	if(t.type !== type){throw 'You must use the `new` keyword when invoking the ' + type + ' constructor.';}
 	NPos3d.blessWithSpriteBase(t,config);
 	return t;
-}
+};
 
 NPos3d.Sprite3D.prototype = {
+	type: 'Sprite3D',
 	render: function(){
 		this.scene.renderSprite(this);
 	},

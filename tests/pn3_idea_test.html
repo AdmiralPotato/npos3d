@@ -45,15 +45,12 @@ var lOffset = {
 }
 s.add(lOffset);
 
-var myCube = new n.Ob3D({pos:lOffset.pos, rot:lOffset.rot, scale:[15,15,15]});
-myCube.shape.color = 'rgba(255,255,255,.1)';
-//console.log(myCube.shape);
-
-/*
-myCube.update = function(s){
-	s.drawLines(this);
-}
-*/
+var myCube = new n.Ob3D({
+	renderAlways: true,
+	pos: lOffset.pos,
+	rot: lOffset.rot,
+	scale:[15,15,15]
+});
 myCube.shape.color='#f00';
 s.add(myCube);
 
@@ -73,15 +70,35 @@ var justDoIt = function(string){
 }
 justGiveMeData('models/pn3_test_shapes.obj',justDoIt);
 
-var myOb = new n.Ob3D({pos:lOffset.pos, rot:lOffset.rot, scale:[300,300,300],renderStyle:'points',pointStyle:'fill',pointScale:2});
+var myOb = new n.Ob3D({
+	renderAlways: true,
+	pos: lOffset.pos,
+	rot: lOffset.rot,
+	scale: [300,300,300],
+	renderStyle: 'points',
+	pointStyle: 'fill',
+	pointScale: 2
+});
 s.add(myOb);
-var myText = new n.VText({string:'Loading Image...',textAlign:'center', pos:lOffset.pos, rot:lOffset.rot, scale:[8,8,8]});
+var myText = new n.VText({
+	renderAlways: true,
+	string: 'Loading Image...',
+	textAlign: 'center',
+	pos: lOffset.pos,
+	rot: lOffset.rot,
+	scale:[8,8,8]
+});
 s.add(myText);
 var myIdea;
 
 var getImageAsMesh = function(imagePath){
 	var path = imagePath + '?cachekill='+Math.round(Math.random()*999999);
-	myIdea = new n.Geom.PN3({path:path,callback:ideaCallback,id:'myIdeaCanvas'});
+	myIdea = new n.Geom.PN3({
+		renderAlways: true,
+		path: path,
+		callback: ideaCallback,
+		id: 'myIdeaCanvas'
+	});
 }
 
 var ideaCallback = function(){

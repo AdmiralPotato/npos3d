@@ -1,7 +1,7 @@
 NPos3d.Geom.Circle = function(args){
-	if(this === window){throw 'Please use the `new` keyword when using the `Circle` constructor.';}
-	var t = this;
-	var args = args || {};
+	var t = this, type = 'Circle';
+	if(t.type !== type){throw 'You must use the `new` keyword when invoking the ' + type + ' constructor.';}
+	args = args || {};
 	t.color = args.color || undefined;
 	t.segments = args.segments || 12;
 	t.offset = args.offset || 0;
@@ -13,6 +13,7 @@ NPos3d.Geom.Circle = function(args){
 }
 
 NPos3d.Geom.Circle.prototype = {
+	type: 'Circle',
 	formCircle: function(){
 		var t = this;
 		t.points = [];

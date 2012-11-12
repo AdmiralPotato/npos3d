@@ -1,4 +1,4 @@
-//Because it's just fine to spend 12K worth of data tin include a sexy vector font that I designed in abouyt an hour and a half
+//Because it's just fine to spend 12K worth of data to include a sexy vector font that I designed in about an hour and a half
 NPos3d.Geom.font = {
 	"!":{"points":[[1,0],[1,2],[1,3],[1,4]],"lines":[[0,1],[2,3]]},
 	"\"":{"points":[[1,1],[1,0],[0,0],[0,1]],"lines":[[0,1],[2,3]]},
@@ -99,9 +99,9 @@ NPos3d.Geom.font = {
 //VectorText generation! Weeeeeeeeeeeee!!!
 
 NPos3d.VText = function(args){
-	var t = this;
-	if(t === window){throw('JIM TYPE ERROR');}
-	var args = args || {};
+	var t = this, type = 'VText';
+	if(t.type !== type){throw 'You must use the `new` keyword when invoking the ' + type + ' constructor.';}
+	args = args || {};
 	NPos3d.blessWith3DBase(t,args);
 	t.string = args.string || 'NEED INPUT';
 	t.textAlign = args.textAlign || 'left';
@@ -116,6 +116,7 @@ NPos3d.VText = function(args){
 	t.cacheTextGeom();
 }
 NPos3d.VText.prototype = {
+	type: 'VText',
 	getStateString:function(){
 		var t = this;
 		return (t.string + t.textAlign + t.characterWidth + t.letterSpacing + t.lineHeight).toString();

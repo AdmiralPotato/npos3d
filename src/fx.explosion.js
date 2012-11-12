@@ -1,8 +1,8 @@
 NPos3d.Fx = NPos3d.Fx || {};
 
 NPos3d.Fx.Explosion = function(args){
-	var t = this;
-	if(t === window){throw 'JIM TYPE ERROR';}
+	var t = this, type = 'Explosion';
+	if(t.type !== type){throw 'You must use the `new` keyword when invoking the ' + type + ' constructor.';}
 	if(NPos3d.Utils === undefined || NPos3d.Utils.Color === undefined){throw 'Please load the `NPos3d.Utils.Color` library prior to invoking the NPos3d.Fx.Explosion effects.';}
 	args = args || {};
 	//NPos3d.blessWith3DBase(t,args);
@@ -30,13 +30,13 @@ NPos3d.Fx.Explosion = function(args){
 };
 
 NPos3d.Fx.Explosion.prototype = {
-
+	type: 'Explosion'
 };
 
 NPos3d.Fx.ExplosionLine = function(args){
-	var t = this;
-	if(t === window){throw 'JIM TYPE ERROR';}
-	var args = args || {};
+	var t = this, type = 'ExplosionLine';
+	if(t.type !== type){throw 'You must use the `new` keyword when invoking the ' + type + ' constructor.';}
+	args = args || {};
 	args.shape = {};
 	NPos3d.blessWith3DBase(t,args);
 	t.o = args.object;
@@ -56,9 +56,10 @@ NPos3d.Fx.ExplosionLine = function(args){
 	t.life = t.lifespan;
 	t.o.scene.add(t);
 	return t;
-}
+};
 
 NPos3d.Fx.ExplosionLine.prototype = {
+	type: 'ExplosionLine',
 	rneg:function(num){return ((Math.random()*2)-1)*num;},
 	rint:function(num){return Math.round(((Math.random()*2)-1)*num);},
 	rpos:function(n){return Math.random() * n;},
@@ -99,4 +100,4 @@ NPos3d.Fx.ExplosionLine.prototype = {
 			t.destroy();
 		}
 	}
-}
+};

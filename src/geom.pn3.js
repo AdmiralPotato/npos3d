@@ -1,7 +1,7 @@
 NPos3d.Geom.PN3 = function(args){
-	var t = this;
-	if(t===window){throw 'You must use the `new` keyword when calling a Constructor Method!';}
-	var args = args || {};
+	var t = this, type = 'PN3', centerData, scaleData;
+	if(t.type !== type){throw 'You must use the `new` keyword when invoking the ' + type + ' constructor.';}
+	args = args || {};
 	if(!args.path){throw 'You MUST provide an image `path` value!';}
 	if(!args.callback){throw 'You MUST provide a `callback` method!';}
 	t.callback = args.callback;
@@ -13,15 +13,15 @@ NPos3d.Geom.PN3 = function(args){
 	t.showCanvas = args.showCanvas || true;
 
 	if(t.centerData){
-		var centerData = function(p3){return [p3[0] -128,p3[1] -128,p3[2] -128];}
+		centerData = function(p3){return [p3[0] -128,p3[1] -128,p3[2] -128];}
 	}else{
-		var centerData = function(p3){return p3;}
+		centerData = function(p3){return p3;}
 	}
 
 	if(t.scaleData){
-		var scaleData = function(p3){return [p3[0]/256,p3[1]/256,p3[2]/256];}
+		scaleData = function(p3){return [p3[0]/256,p3[1]/256,p3[2]/256];}
 	}else{
-		var scaleData = function(p3){return p3;}
+		scaleData = function(p3){return p3;}
 	}
 	t.canvas = document.getElementById(t.id);
 	if(!t.canvas){
@@ -37,7 +37,7 @@ NPos3d.Geom.PN3 = function(args){
 		t.canvas.style.imageRendering = '-moz-crisp-edges';
 		t.canvas.style.imageRendering = '-webkit-optimize-contrast';
 		document.body.appendChild(t.canvas);
-	};
+	}
 	t.c = t.canvas.getContext('2d');
 	t.width = 0;
 	t.height = 0;
@@ -89,6 +89,7 @@ NPos3d.Geom.PN3 = function(args){
 	return t;
 }
 NPos3d.Geom.PN3.prototype ={
+	type: 'PN3',
 	getOffset:function(x,y){return (x + (y * this.canvas.width)) * 4;},
 	setPixel:function(x,y,rgba){
 		var offset = this.getOffset(x,y);
@@ -111,9 +112,9 @@ NPos3d.Geom.PN3.prototype ={
 	convertP4ToLine:function(p4){
 		var t = this;
 		console.log('---- p4:',p4);
-		var hex0 = parseInt(p4[0]).toString();
-		var hex1 = parseInt(p4[1]).toString();
-		var hex2 = parseInt(p4[2]).toString();
+		//var hex0 = parseInt(p4[0]).toString();
+		//var hex1 = parseInt(p4[1]).toString();
+		//var hex2 = parseInt(p4[2]).toString();
 		//console.log('hex0:',hex0,'hex1:',hex1,'hex2:',hex2);
 		var hex0 = t.stringPad(p4[0].toString(16),2,'0');
 		var hex1 = t.stringPad(p4[1].toString(16),2,'0');
@@ -130,9 +131,9 @@ NPos3d.Geom.PN3.prototype ={
 };
 
 NPos3d.Geom.MeshToPng = function(args){
-	var t = this;
-	if(t===window){throw 'You must use the `new` keyword when calling a Constructor Method!';}
-	var args = args || {};
+	var t = this, type = 'MeshToPng', key;
+	if(t.type !== type){throw 'You must use the `new` keyword when invoking the ' + type + ' constructor.';}
+	args = args || {};
 
 	t.centerData = initVal(args.centerData, false);
 	t.scaleData = initVal(args.scaleData, true);
@@ -171,8 +172,8 @@ NPos3d.Geom.MeshToPng = function(args){
 		t.boundingBox[1][2]
 	);
 	t.boundingScale = Math.max(t.boundingLengths.x, t.boundingLengths.y, t.boundingLengths.z);
-	for(var key in t.boundingLengths){
-		if(t.boundingLengths[key] === t.boundingScale){
+	for(key in t.boundingLengths){
+		if(t.boundingLengths.hasOwnProperty(key) && t.boundingLengths[key] === t.boundingScale){
 			t.largestAxis = key;
 		}
 	}
@@ -180,12 +181,12 @@ NPos3d.Geom.MeshToPng = function(args){
 		x: t.boundingLengths.x / 2,
 		y: t.boundingLengths.y / 2,
 		z: t.boundingLengths.z / 2
-	}
+	};
 	t.scaledHalves = {
 		x: t.boundingLengths.x / 2 / t.boundingScale,
 		y: t.boundingLengths.y / 2 / t.boundingScale,
 		z: t.boundingLengths.z / 2 / t.boundingScale
-	}
+	};
 	console.log('boundingBox:',t.boundingBox,'boundingScale:',t.boundingScale,'boundingLengths:',t.boundingLengths,'centerScale:',t.centerScale);
 
 	if(t.scaleData && t.centerData){
@@ -285,6 +286,7 @@ NPos3d.Geom.MeshToPng = function(args){
 };
 
 NPos3d.Geom.MeshToPng.prototype={
+	type: 'MeshToPng',
 	stringPad:NPos3d.Geom.PN3.prototype.stringPad,
 	convertLineToP4:function(line){
 		var t = this;
@@ -312,8 +314,7 @@ NPos3d.Geom.MeshToPng.prototype={
 		return p4;
 	},
 	normalizeVertexToCenterScale:function(p3){
-		var t = this;
-		var output = [
+		var t = this, output = [
 			(p3[0] / t.centerScale) /2,
 			(p3[1] / t.centerScale) /2,
 			(p3[2] / t.centerScale) /2

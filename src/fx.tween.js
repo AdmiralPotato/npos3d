@@ -1,8 +1,8 @@
 NPos3d.Fx = NPos3d.Fx || {};
 
 NPos3d.Fx.Tween = function(args){
-	var t = this;
-	if(t.__proto__ !== NPos3d.Fx.Tween.prototype){throw 'JIM TYPE ERROR';}
+	var t = this, type = 'Tween';
+	if(t.type !== type){throw 'You must use the `new` keyword when invoking the ' + type + ' constructor.';}
 	if(!args.object){
 		throw 'Fx.Tween requires an Object as the value for the `object` argument in the passed configuration object.';
 	}
@@ -31,9 +31,10 @@ NPos3d.Fx.Tween = function(args){
 	}
 	t.o.add(this);
 	return t;
-}
+};
 
 NPos3d.Fx.Tween.prototype = {
+	type: 'Tween',
 	transitionLinear:function(n){return n;},
 	update:function(){
 		var t = this;
