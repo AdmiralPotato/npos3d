@@ -28,9 +28,9 @@ var makeSelfDestructingCube = function(){
 		t.render();
 		t.life -= 1;
 		if(t.life < 1){
-			n.Fx.Explosion({object:t});
+			new n.Fx.Explosion({object:t});
 		}
-	}
+	};
 	s.add(myQube);
 }
 
