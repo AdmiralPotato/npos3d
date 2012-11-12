@@ -612,9 +612,9 @@ NPos3d.Scene.prototype = {
 		c.beginPath();
 		c.moveTo(o.a.x,o.a.y);
 		c.lineTo(o.b.x,o.b.y);
-		c.strokeStyle = o.color;
-		c.lineWidth = o.lineWidth;
-		c.lineCap = 'round';
+		if(c.strokeStyle !== o.color){c.strokeStyle = o.color;}
+		if(c.lineWidth !== o.lineWidth){c.lineWidth = o.lineWidth;}
+		if(c.lineCap !== 'round'){c.lineCap = 'round';}
 		c.stroke();
 	},
 	drawCircle: function(c,o){
@@ -622,12 +622,12 @@ NPos3d.Scene.prototype = {
 		c.beginPath();
 		c.arc(o.pos.x,o.pos.y,(o.pos.scale * o.pointScale),0,tau,false);
 		if (o.pointStyle === 'fill') {
-			c.fillStyle = o.color;
+			if(c.fillStyle !== o.color){c.fillStyle = o.color};
 			c.fill();
 		}else if (o.pointStyle === 'stroke') {
-			c.strokeStyle = o.color;
-			c.lineWidth = o.lineWidth;
-			c.lineCap = 'round';
+			if(c.strokeStyle !== o.color){c.strokeStyle = o.color;}
+			if(c.lineWidth !== o.lineWidth){c.lineWidth = o.lineWidth;}
+			if(c.lineCap !== 'round'){c.lineCap = 'round';}
 			c.stroke();
 		}
 	},
