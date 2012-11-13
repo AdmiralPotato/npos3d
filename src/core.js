@@ -314,7 +314,9 @@ NPos3d.Scene = function (args) {
 		t.canvas.style.display = 'block';
 		t.canvas.style.top = 0;
 		t.canvas.style.left = 0;
-		t.canvas.style.zIndex = args.zIndex ||-10;
+		if(args.zIndex !== undefined){
+			t.canvas.style.zIndex = args.zIndex;
+		}
 		if (t.isMobile) {
 			if(t.useWindowSize){
 				t.checkWindow = function () {
