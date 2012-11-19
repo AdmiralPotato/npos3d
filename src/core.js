@@ -132,9 +132,9 @@ NPos3d.Maths = {
 		var d;
 		//Works for 2D, 3D, and nD! Please, please feed in bounds generated like the line below.
 		//var bounds = nGetBounds(pointList);
-		//d stands for dimention
+		//d stands for dimension
 		for (d = 0; d < point.length; d += 1) {
-			//dimentional value check
+			//dimensional value check
 			if (point[d] < bounds[0][d] || point[d] > bounds[1][d]) {
 				return false;
 			}
@@ -144,7 +144,7 @@ NPos3d.Maths = {
 	pointIn2dBounds: function (point, bounds) {
 		//Works for 2D! Please, please feed in bounds generated like the line below.
 		//var bounds = nGetBounds(pointList);
-		//dimentional value check
+		//dimensional value check
 		if (
 			point[0] < bounds[0][0] || point[0] > bounds[1][0] ||
 				point[1] < bounds[0][1] || point[1] > bounds[1][1]
@@ -156,7 +156,7 @@ NPos3d.Maths = {
 	pointIn3dBounds: function (point, bounds) {
 		//Works for 3D! Please, please feed in bounds generated like the line below.
 		//var bounds = nGetBounds(pointList);
-		//dimentional value check
+		//dimensional value check
 		if (
 			point[0] < bounds[0][0] || point[0] > bounds[1][0] ||
 				point[1] < bounds[0][1] || point[1] > bounds[1][1] ||
@@ -191,6 +191,7 @@ NPos3d.Maths = {
 		var m = NPos3d.Maths, posDiff = m.p3Sub(endPos, o.pos);
 		o.rot = m.getRelativeAngle3D(posDiff);
 	},
+	/*
 	rotatePoint: function (x,y,rot) {
 		var length = Math.sqrt((x * x) + (y * y));
 		var currentRot = Math.atan2(x,y);
@@ -199,7 +200,7 @@ NPos3d.Maths = {
 		return [x,y];
 	},
 	totalRotationCalculations: 0,
-	p3Rotate: function (p3,rot,order) {
+	p3RotateA: function (p3,rot,order) {
 		//return p3;
 		var m = NPos3d.Maths, x = p3[0], y = p3[1], z = p3[2], xr = rot[0], yr = rot[1], zr = rot[2];
 		//Alright, here's something interesting.
@@ -236,9 +237,72 @@ NPos3d.Maths = {
 		}
 		return [x,y,z];
 	},
+	*/
+	p3RotMatrix: function (r){
+		var m = NPos3d.Maths,
+			xc = 1,
+			xs = 0,
+			yc = 1,
+			ys = 0,
+			zc = 1,
+			zs = 0;
+		if(r[0] !== 0){
+			xc = cos(r[0]),
+			xs = sin(r[0]);
+		}
+		if(r[1] !== 0){
+			yc = cos(r[1]),
+			ys = sin(r[1]);
+		}
+		if(r[2] !== 0){
+			zc = cos(r[2]),
+			zs = sin(r[2]);
+		}
+		//using the same matrix repeatedly is a lot easier on the garbage collector
+		if(!m.__matrix){
+			m.__matrix = [
+				[[0,0,0],[0,0,0],[0,0,0]],
+				[[0,0,0],[0,0,0],[0,0,0]],
+				[[0,0,0],[0,0,0],[0,0,0]]
+			];
+		}
+		m.__matrix[0][0][0] = 1, m.__matrix[0][0][1] = 0, m.__matrix[0][0][2] = 0,
+		m.__matrix[0][1][0] = 0, m.__matrix[0][1][1] = xc, m.__matrix[0][1][2] = -xs,
+		m.__matrix[0][2][0] = 0, m.__matrix[0][2][1] = xs, m.__matrix[0][2][2] = xc,
+
+		m.__matrix[1][0][0] = yc, m.__matrix[1][0][1] = 0, m.__matrix[1][0][2] = ys,
+		m.__matrix[1][1][0] = 0, m.__matrix[1][1][1] = 1, m.__matrix[1][1][2] = 0,
+		m.__matrix[1][2][0] = -ys, m.__matrix[1][2][1] = 0, m.__matrix[1][2][2] = yc,
+
+		m.__matrix[2][0][0] = zc, m.__matrix[2][0][1] = -zs, m.__matrix[2][0][2] = 0,
+		m.__matrix[2][1][0] = zs, m.__matrix[2][1][1] = zc, m.__matrix[2][1][2] = 0,
+		m.__matrix[2][2][0] = 0, m.__matrix[2][2][1] = 0, m.__matrix[2][2][2] = 1;
+		return m.__matrix;
+	},
+	p3MatrixMultiply: function(point, rot, m, order) {
+		var i, x, y, z, len = order.length,
+			p = [point[0],point[1],point[2]]; //because point.slice() hurt performance quite a bit
+		for(i = 0; i < 3; i += 1){ //allows for order to have more than 3 keys, if you feel exotic
+			if(rot[order[i]] !== 0){ //only rotate if this axis is non-zero
+				x = p[0], y = p[1], z = p[2];
+				p[0] = (x * m[order[i]][0][0]) + (y * m[order[i]][0][1]) + (z * m[order[i]][0][2]);
+				p[1] = (x * m[order[i]][1][0]) + (y * m[order[i]][1][1]) + (z * m[order[i]][1][2]);
+				p[2] = (x * m[order[i]][2][0]) + (y * m[order[i]][2][1]) + (z * m[order[i]][2][2]);
+			}
+		}
+		return p;
+	},
+	p3Rotate: function (p3, rot, order){
+		var m = NPos3d.Maths;
+		if(m.__lastRot !== rot){
+			m.__lastRot = rot;
+			m.p3RotMatrix(rot);
+		}
+		return m.p3MatrixMultiply(p3, rot, m.__matrix, order);
+	},
 	getP3Scaled: function (p3,scale) {
 		//return p3;
-		return [p3[0]*scale[0], p3[1]*scale[1], p3[2]*scale[2]];;
+		return [p3[0]*scale[0], p3[1]*scale[1], p3[2]*scale[2]];
 	},
 	getP2Offset: function (p2,offset) {
 		//an efficient hack to quickly add an offset to a 2D point
@@ -257,7 +321,7 @@ NPos3d.Maths = {
 		}
 		for (var i = 1; i < pointList.length; i += 1) {
 			var p = pointList[i];
-			//d stands for dimention
+			//d stands for dimension
 			for (var d = 0; d < p.length; d += 1) {
 				if (p[d] < min[d]) {min[d] = p[d];}
 				else if (p[d] > max[d]) {max[d] = p[d];}
@@ -371,7 +435,7 @@ NPos3d.Scene = function (args) {
 			e.preventDefault();
 		}
 		var canvasOffset = {x: 0,y: 0};
-		if (!t.fullscreen) {
+		if (!t.fullScreen) {
 			var offset = t.canvas.getBoundingClientRect();
 			canvasOffset.x = offset.left;
 			canvasOffset.y = offset.top;
@@ -397,7 +461,7 @@ NPos3d.Scene = function (args) {
 				t.mpos.y = Math.ceil((e.clientY / t.pixelScale) - t.cy);
 			}
 		}
-	}
+	};
 	window.addEventListener('mousemove',t.mouseHandler,false);
 	window.addEventListener('touchstart',t.mouseHandler,false);
 	window.addEventListener('touchmove',t.mouseHandler,false);
@@ -623,7 +687,7 @@ NPos3d.Scene.prototype = {
 		c.beginPath();
 		c.arc(o.pos.x,o.pos.y,(o.pos.scale * o.pointScale),0,tau,false);
 		if (o.pointStyle === 'fill') {
-			if(c.fillStyle !== o.color){c.fillStyle = o.color};
+			if(c.fillStyle !== o.color){c.fillStyle = o.color}
 			c.fill();
 		}else if (o.pointStyle === 'stroke') {
 			if(c.strokeStyle !== o.color){c.strokeStyle = o.color;}
@@ -633,7 +697,7 @@ NPos3d.Scene.prototype = {
 		}
 	},
 	lineRenderLoop: function (o) {
-		var t = this, c = t.c, m = NPos3d.Maths, computedPointList = [], i, point, p3a, p3b, t3a, t3b;
+		var t = this, m = NPos3d.Maths, computedPointList = [], i, point, p3a, p3b, t3a, t3b;
 		for (i = 0; i < o.shape.points.length; i += 1) {
 			//to make sure I'm not messing with the original array...
 			point = [o.transformedPointCache[i][0],o.transformedPointCache[i][1],o.transformedPointCache[i][2]];
@@ -676,7 +740,7 @@ NPos3d.Scene.prototype = {
 		}
 	},
 	drawLines: function (o) {
-		var t = this, m = NPos3d.Maths, i, point, line, bbCube, bbMinOffset, bbMaxOffset, bbOffScreen;
+		var t = this, m = NPos3d.Maths, i, point, bbCube, bbMinOffset, bbMaxOffset, bbOffScreen, bbp;
 		//I see no reason to check whether the rotation/scale is different between processing each point,
 		//so I'll just do that once per frame and have a loop just for rotating the points.
 		if (o.lastRotString !== m.getP3String(o.rot) || o.lastScaleString !== m.getP3String(o.scale)) {
@@ -725,7 +789,7 @@ NPos3d.Scene.prototype = {
 		}
 	},
 	drawPoints: function (o) {
-		var t = this, m = NPos3d.Maths, i, point, bbMinOffset, bbMaxOffset, bbCube, bbOffScreen;
+		var t = this, m = NPos3d.Maths, i, point, bbMinOffset, bbMaxOffset, bbCube, bbOffScreen, bbp;
 		//I see no reason to check whether the rotation/scale is different between processing each point,
 		//so I'll just do that once per frame and have a loop just for rotating the points.
 		if (o.lastRotString !== m.getP3String(o.rot) || o.lastScaleString !== m.getP3String(o.scale)) {
