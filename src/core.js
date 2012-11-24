@@ -313,6 +313,7 @@ NPos3d.Maths = {
 	},
 	nGetBounds: function (pointList) {
 		//Works for 2D, 3D, and nD!
+		if(pointList.length < 1){return [[0,0,0],[0,0,0]];} //assume 3D if empty
 		var min = [];
 		var max = [];
 		var p = pointList[0];
