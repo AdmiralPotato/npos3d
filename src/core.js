@@ -238,6 +238,11 @@ NPos3d.Maths = {
 		return [x,y,z];
 	},
 	*/
+	__matrix: [
+		[[0,0,0],[0,0,0],[0,0,0]],
+		[[0,0,0],[0,0,0],[0,0,0]],
+		[[0,0,0],[0,0,0],[0,0,0]]
+	],
 	p3RotMatrix: function (r){
 		var m = NPos3d.Maths,
 			xc = 1,
@@ -259,13 +264,7 @@ NPos3d.Maths = {
 			zs = sin(r[2]);
 		}
 		//using the same matrix repeatedly is a lot easier on the garbage collector
-		if(!m.__matrix){
-			m.__matrix = [
-				[[0,0,0],[0,0,0],[0,0,0]],
-				[[0,0,0],[0,0,0],[0,0,0]],
-				[[0,0,0],[0,0,0],[0,0,0]]
-			];
-		}
+
 		m.__matrix[0][0][0] = 1, m.__matrix[0][0][1] = 0, m.__matrix[0][0][2] = 0,
 		m.__matrix[0][1][0] = 0, m.__matrix[0][1][1] = xc, m.__matrix[0][1][2] = -xs,
 		m.__matrix[0][2][0] = 0, m.__matrix[0][2][1] = xs, m.__matrix[0][2][2] = xc,
@@ -292,10 +291,13 @@ NPos3d.Maths = {
 		}
 		return p;
 	},
+	__lastRot: [0,0,0],
 	p3Rotate: function (p3, rot, order){
 		var m = NPos3d.Maths;
-		if(m.__lastRot !== rot){
-			m.__lastRot = rot;
+		if(m.__lastRot[0] !== rot[0] || m.__lastRot[1] !== rot[1] || m.__lastRot[2] !== rot[2]){
+			m.__lastRot[0] = rot[0],
+			m.__lastRot[1] = rot[1],
+			m.__lastRot[2] = rot[2];
 			m.p3RotMatrix(rot);
 		}
 		return m.p3MatrixMultiply(p3, rot, m.__matrix, order);
