@@ -14,7 +14,6 @@ NPos3d.Layout.ResponsivePoint = function(args) {
 	t.scene = args.scene;
 	t.scene.add(t); //adds itself to the scene automatically, because it needs the scene to work
 	t.update();
-	console.dir(t);
 	return t;
 };
 
