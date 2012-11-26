@@ -37,6 +37,7 @@ NPos3d.Layout.ResponsivePoint.prototype.update = function() {
 	}
 	t[2] = t.offset[2];
 	if(typeof t.offset[3] !== 'undefined') { //set the color property, if it's a vertex
+		t[3] = t.offset[3];
 		t.length = 4;
 	} else {
 		t.length = 3;
