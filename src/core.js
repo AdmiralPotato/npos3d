@@ -651,6 +651,7 @@ NPos3d.Scene.prototype = {
 				t.c.fillRect(0,0,t.w,t.h);
 			}
 			t.c.save();
+			t.c.globalCompositeOperation = t.globalCompositeOperation;
 			t.c.translate(t.cx, t.cy);
 			t.renderInstructionList.sort(t.sortRenderInstructionByZDepth);
 			t.render();
