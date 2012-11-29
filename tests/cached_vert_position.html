@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Parenting</title>
+</head>
+<body>
+<script src="../src/core.js"></script>
+<script src="../src/geom.circle.js"></script>
+<script src="../src/sprite.js"></script>
+<script>
+
+var n = NPos3d;
+var s = new n.Scene({
+	lineWidth: 2
+	//frameRate: 2
+});
+
+var ob = {
+	shape: new n.Geom.Circle({
+		segments: 3,
+		radius: 50
+	}),
+	renderStyle: 'both',
+	pointStyle: 'stroke',
+	update: function(){
+		var t = this;
+		t.rot[0] += deg;
+		t.rot[1] += deg;
+		t.scale[0] = t.scale[1] = t.scale[2] = (sin(t.rot[1]) * 1) + 2;
+		t.pointScale = (-sin(t.rot[1]) * 5) + 10;
+		t.color = 'hsl(' + (t.rot[1] / deg)+ ', 100%, 50%)';
+		t.render();
+	}
+};
+n.blessWith3DBase(ob, {});
+s.add(ob);
+s.updateTransformedPointCache(ob);
+
+var hatSprite = new n.Sprite3D({
+	path:'img/swinj_green_hat_sprite_4x.png',
+	numFrames:4,
+	pos: ob.transformedPointCache[0],
+	depthScale: true
+});
+s.add(hatSprite);
+
+var toothSprite = new n.Sprite3D({
+	path:'img/swinj_gold_tooth_4x.png',
+	numFrames:3,
+	pos: ob.transformedPointCache[1],
+	depthScale: true
+});
+s.add(toothSprite);
+
+var heartSprite = new n.Sprite3D({
+	path:'../prelim_tests/sprites/megaman_heart_sprite_4x.png',
+	numFrames:4,
+	pos: ob.transformedPointCache[2],
+	depthScale: true
+});
+s.add(heartSprite);
+
+</script>
+</body>
+</html>

@@ -1,7 +1,11 @@
 NPos3d.Scene.prototype.drawSprite = function(c,o){
 	c.save();
 	c.translate(o.point2D.x, o.point2D.y);
-	c.scale(o.scale,o.scale);
+	if(o.depthScale){
+		c.scale(o.scale * o.point2D.scale, o.scale * o.point2D.scale);
+	} else {
+		c.scale(o.scale, o.scale);
+	}
 	c.rotate(o.rot);
 	if(o.numFrames > 1){
 		o.frameState += 0.3;
@@ -42,6 +46,7 @@ NPos3d.blessWithSpriteBase = function(o,config){
 	o.pos = config.pos || [0,0,0];
 	o.rot = config.rot || 0;
 	o.scale = config.scale || 1;
+	o.depthScale = config.depthScale || false; //Default behavior: Act as a non-scaling billboard
 	o.numFrames = config.numFrames || 1;
 	o.frameState = o.numFrames;
 	o.width = 0;
