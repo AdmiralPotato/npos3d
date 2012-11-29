@@ -103,6 +103,7 @@ var NPos3d = NPos3d || {
 		//This function should be assigned to objects in the scene which will be rendered;
 		//Example: myObject.render = NPos3d.renderFunc;
 		var t = this; //should be referring to the object being rendered
+		t.scene.updateTransformedPointCache(t);
 		if (t.renderStyle === 'lines') {
 			t.scene.drawLines(t);
 		}else if (t.renderStyle === 'points') {
@@ -703,11 +704,38 @@ NPos3d.Scene.prototype = {
 			}
 		}
 	},
+	updateTransformedPointCache: function (o) {
+		var m = NPos3d.Maths, i, point, tempPoint;
+		//I see no reason to check whether the rotation/scale is different between processing each point,
+		//so I'll just do that once per frame and have a loop just for rotating the points.
+		if (o.lastRotString !== m.getP3String(o.rot) || o.lastScaleString !== m.getP3String(o.scale)) {
+			//console.log(o.lastRotString);
+			if(o.transformedPointCache.length !== o.shape.points.length){
+				for (i = 0; i < o.shape.points.length; i += 1) {
+					o.transformedPointCache[i] = [0,0,0];
+				}
+			}
+			for (i = 0; i < o.shape.points.length; i += 1) {
+				//to make sure I'm not messing with the original array...
+				point = o.transformedPointCache[i];
+				tempPoint = m.getP3Scaled(o.shape.points[i], o.scale);
+				tempPoint = m.p3Rotate(tempPoint, o.rot, o.rotOrder);
+				point[0] = tempPoint[0];
+				point[1] = tempPoint[1];
+				point[2] = tempPoint[2];
+				point[3] = o.shape.points[i][3] || false;//Point Color Preservation - no need to offset or rotate it
+			}
+
+			o.boundingBox = m.nGetBounds(o.transformedPointCache);
+			o.lastScaleString = m.getP3String(o.scale);
+			o.lastRotString = m.getP3String(o.rot);
+		}
+	},
 	lineRenderLoop: function (o) {
 		var t = this, m = NPos3d.Maths, computedPointList = [], i, point, p3a, p3b, t3a, t3b;
 		for (i = 0; i < o.shape.points.length; i += 1) {
 			//to make sure I'm not messing with the original array...
-			point = [o.transformedPointCache[i][0],o.transformedPointCache[i][1],o.transformedPointCache[i][2]];
+			point = o.transformedPointCache[i];
 			point = m.p3Add(point, o.pos);
 			point = m.p3Add(point, t.invertedCameraPos);
 			computedPointList[i] = point;
@@ -747,25 +775,7 @@ NPos3d.Scene.prototype = {
 		}
 	},
 	drawLines: function (o) {
-		var t = this, m = NPos3d.Maths, i, point, bbCube, bbMinOffset, bbMaxOffset, bbOffScreen, bbp;
-		//I see no reason to check whether the rotation/scale is different between processing each point,
-		//so I'll just do that once per frame and have a loop just for rotating the points.
-		if (o.lastRotString !== m.getP3String(o.rot) || o.lastScaleString !== m.getP3String(o.scale)) {
-			//console.log(o.lastRotString);
-			o.transformedPointCache = [];
-			for (i = 0; i < o.shape.points.length; i += 1) {
-				//to make sure I'm not messing with the original array...
-				point = [o.shape.points[i][0],o.shape.points[i][1],o.shape.points[i][2]];
-				point = m.getP3Scaled(point, o.scale);
-				point = m.p3Rotate(point, o.rot, o.rotOrder);
-				point[3] = o.shape.points[i][3] || false;//Point Color Preservation - no need to offset or rotate it
-				o.transformedPointCache[i] = point;
-			}
-
-			o.boundingBox = m.nGetBounds(o.transformedPointCache);
-			o.lastScaleString = m.getP3String(o.scale);
-			o.lastRotString = m.getP3String(o.rot);
-		}
+		var t = this, m = NPos3d.Maths, i, bbCube, bbMinOffset, bbMaxOffset, bbOffScreen, bbp;
 
 		if (o.renderAlways) {
 			t.lineRenderLoop(o);
@@ -796,25 +806,7 @@ NPos3d.Scene.prototype = {
 		}
 	},
 	drawPoints: function (o) {
-		var t = this, m = NPos3d.Maths, i, point, bbMinOffset, bbMaxOffset, bbCube, bbOffScreen, bbp;
-		//I see no reason to check whether the rotation/scale is different between processing each point,
-		//so I'll just do that once per frame and have a loop just for rotating the points.
-		if (o.lastRotString !== m.getP3String(o.rot) || o.lastScaleString !== m.getP3String(o.scale)) {
-			//console.log(o.lastRotString);
-			o.transformedPointCache = [];
-			for (i = 0; i < o.shape.points.length; i += 1) {
-				//to make sure I'm not messing with the original array...
-				point = [o.shape.points[i][0],o.shape.points[i][1],o.shape.points[i][2]];
-				point = m.getP3Scaled(point, o.scale);
-				point = m.p3Rotate(point, o.rot, o.rotOrder);
-				point[3] = o.shape.points[i][3] || false;//Point Color Preservation - no need to offset or rotate it
-				o.transformedPointCache[i] = point;
-			}
-
-			o.boundingBox = m.nGetBounds(o.transformedPointCache);
-			o.lastScaleString = m.getP3String(o.scale);
-			o.lastRotString = m.getP3String(o.rot);
-		}
+		var t = this, m = NPos3d.Maths, i, bbMinOffset, bbMaxOffset, bbCube, bbOffScreen, bbp;
 
 		if (o.renderAlways) {
 			t.pointRenderLoop(o);
@@ -848,10 +840,10 @@ NPos3d.Scene.prototype = {
 		var t = this, m = NPos3d.Maths, computedPointList = [], i, point, p3a, p0, screenBounds, circleArgs;
 		for (i = 0; i < o.shape.points.length; i += 1) {
 			//to make sure I'm not messing with the original array...
-			point = [o.transformedPointCache[i][0],o.transformedPointCache[i][1],o.transformedPointCache[i][2]];
+			point = o.transformedPointCache[i];
 			point = m.p3Add(point, o.pos);
 			point = m.p3Add(point, t.invertedCameraPos);
-			point[3] = o.transformedPointCache[i][3] || false;//Point Color Preservation - no need to offset or rotate it
+			point[3] = o.shape.points[i][3] || false;//Point Color Preservation - no need to offset or rotate it
 			computedPointList[i] = point;
 		}
 		for (i = 0; i < o.transformedPointCache.length; i += 1) {
