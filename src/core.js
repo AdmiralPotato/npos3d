@@ -366,7 +366,7 @@ NPos3d.Scene = function (args) {
 	t.fullScreen = args.fullScreen === undefined || args.fullScreen === true ? true : false;
 
 	t.isMobile = (/iphone|ipad|ipod|android|blackberry|mini|windows\sce|palm/i.test(navigator.userAgent.toLowerCase()));
-	t.useWindowSize = (/nexus\s7/i.test(navigator.userAgent.toLowerCase()));
+	t.useWindowSize = t.isMobile && /chrome/i.test(navigator.userAgent.toLowerCase()); //is it mobile Chrome?
 
 	t.canvasId = args.canvasId || 'canvas';
 	t.existingCanvas = args.canvas !== undefined;
@@ -711,6 +711,7 @@ NPos3d.Scene.prototype = {
 		if (o.lastRotString !== m.getP3String(o.rot) || o.lastScaleString !== m.getP3String(o.scale)) {
 			//console.log(o.lastRotString);
 			if(o.transformedPointCache.length !== o.shape.points.length){
+				o.transformedPointCache = [];
 				for (i = 0; i < o.shape.points.length; i += 1) {
 					o.transformedPointCache[i] = [0,0,0];
 				}
@@ -733,7 +734,7 @@ NPos3d.Scene.prototype = {
 	},
 	lineRenderLoop: function (o) {
 		var t = this, m = NPos3d.Maths, computedPointList = [], i, point, p3a, p3b, t3a, t3b;
-		for (i = 0; i < o.shape.points.length; i += 1) {
+		for (i = 0; i < o.transformedPointCache.length; i += 1) {
 			//to make sure I'm not messing with the original array...
 			point = o.transformedPointCache[i];
 			point = m.p3Add(point, o.pos);
@@ -838,12 +839,12 @@ NPos3d.Scene.prototype = {
 	},
 	pointRenderLoop: function (o) {
 		var t = this, m = NPos3d.Maths, computedPointList = [], i, point, p3a, p0, screenBounds, circleArgs;
-		for (i = 0; i < o.shape.points.length; i += 1) {
+		for (i = 0; i < o.transformedPointCache.length; i += 1) {
 			//to make sure I'm not messing with the original array...
 			point = o.transformedPointCache[i];
 			point = m.p3Add(point, o.pos);
 			point = m.p3Add(point, t.invertedCameraPos);
-			point[3] = o.shape.points[i][3] || false;//Point Color Preservation - no need to offset or rotate it
+			point[3] = o.transformedPointCache[i][3] || false;//Point Color Preservation - no need to offset or rotate it
 			computedPointList[i] = point;
 		}
 		for (i = 0; i < o.transformedPointCache.length; i += 1) {

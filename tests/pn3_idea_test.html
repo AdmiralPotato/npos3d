@@ -35,14 +35,14 @@ var lOffset = {
 	rot:[0,0,0],
 	update:function(){
 	//this.rot[0] += deg*1;
-	this.rot[1] = -deg*s.mpos.x /2;
-	this.rot[0] = deg*s.mpos.y /2;
+	this.rot[1] = deg*s.mpos.x /2;
+	this.rot[0] = -deg*s.mpos.y /2;
 	scene.camera.pos[2] += (scroll/8);
 	scroll = 0;
 	//this.pos[0] = s.mpos.x;
 	//this.pos[1] = s.mpos.y;
 	}
-}
+};
 s.add(lOffset);
 
 var myCube = new n.Ob3D({
