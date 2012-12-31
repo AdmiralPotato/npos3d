@@ -23,14 +23,15 @@ body{
 }
 #controls{
 	position: absolute;
-	top: 0px;
-	right: 0px;
+	top: 0;
+	right: 0;
 	padding: 16px;
 	background-color: rgba(255,255,255,0.1);
 	color: #9f0;
 	font-size: 12px;
 	line-height: 16px;
 	font-family: monospace;
+	z-index: 1;
 }
 #user_data{
 	display: none;
@@ -82,8 +83,8 @@ var viewControl = {
 	rot:[0,0,0],
 	update:function(){
 	//this.rot[0] += deg*1;
-	this.rot[1] = -deg*s.mpos.x /2;
-	this.rot[0] = deg*s.mpos.y /2;
+	this.rot[1] = deg*s.mpos.x /2;
+	this.rot[0] = -deg*s.mpos.y /2;
 	scene.camera.pos[2] += (scroll/8);
 	scroll = 0;
 	//this.pos[0] = s.mpos.x;
@@ -97,7 +98,7 @@ myCube.shape.color='#f00';
 s.add(myCube);
 var myShape = new n.Ob3D({pos:viewControl.pos, rot:viewControl.rot, scale:[300,300,300],renderAlways:true,renderStyle:'points',pointStyle:'stroke'});
 s.add(myShape);
-var myText = new n.VText({pos:viewControl.pos, rot:viewControl.rot, scale:[15,15,15],renderAlways:true,string:'Upload an\nOBJ file',textAlign:'center'});
+var myText = new n.VText({pos:viewControl.pos, rot:viewControl.rot, scale:[2,2,2],renderAlways:true,string:'Upload an\nOBJ file',textAlign:'center'});
 s.add(myText);
 //var myPn3 = new n.Ob3D({pos:viewControl.pos, rot:viewControl.rot, scale:[30,30,30],renderAlways:true});
 //s.add(myPn3);
@@ -127,7 +128,6 @@ if(dataHolder.value.length > 10){ //Why ten? Meh. Dunno. No way is an OBJ that s
 				var myPn3 = new n.Geom.PN3({
 					path: myPng.image.src,
 					callback:function(){
-						myShape.lastRotString = false;
 						myShape.shape = myPn3;
 						myText.string = myPn3.points.length + ' Points';
 					}

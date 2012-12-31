@@ -56,7 +56,7 @@ myOb.update = function(){
 		t.shape.segments += 1;
 		if(t.shape.segments > 16){t.shape.segments = 3;}
 		t.shape.formCircle();
-		t.lastRotString = false;
+		t.lastGlobalCompositeMatrixString = false;
 	}
 	try{
 		t.render();
@@ -69,12 +69,6 @@ myOb.update = function(){
 	}
 }
 s.add(myOb);
-
-//var myText = new n.VText({string:'Loading Image...',textAlign:'center', pos:userControl.pos, rot:userControl.rot, scale:[8,8,8]});
-//s.add(myText);
-
-
-
 
 </script>
 </body>

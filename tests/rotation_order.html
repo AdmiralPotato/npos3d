@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Rotation Order</title>
+</head>
+<body>
+<script src="../src/core.js"></script>
+<!--<script src="https://raw.github.com/AdmiralPotato/npos3d/master/src/core.js"></script>-->
+<script src="../src/font.js"></script>
+<script src="../src/geom.sphere.js"></script>
+<script src="../src/sprite.js"></script>
+<script>
+
+var n = NPos3d,
+	s = new n.Scene();
+
+var mySphereGeom = new n.Geom.Sphere({
+	radius:30,
+	order:'xyz'
+});
+var addAxiesToShape = function(shape, radius){
+	shape.points.push([-radius,0,0, '#f00'], [radius,0,0, '#f00']);
+	shape.lines.push([shape.points.length -2, shape.points.length -1, '#f00']);
+	shape.points.push([0,-radius,0, '#0f0'], [0,radius,0, '#0f0']);
+	shape.lines.push([shape.points.length -2, shape.points.length -1, '#0f0']);
+	shape.points.push([0,0,-radius, '#00f'], [0,0,radius, '#00f']);
+	shape.lines.push([shape.points.length -2, shape.points.length -1, '#00f']);
+};
+addAxiesToShape(mySphereGeom, 50);
+var rotOrderList = [
+	[0,1,2],
+	[0,2,1],
+	[1,2,0],
+	[1,0,2],
+	[2,0,1],
+	[2,1,0]
+];
+var currentOrder = 5;
+var rotOrder = [0,1,2];
+var sphereConfig = {
+	rotOrder: rotOrder,
+	shape: mySphereGeom,
+	pos: [0, -64, 0],
+	color: '#999',
+	renderStyle: 'both',
+	pointScale: 2.5
+};
+var align = 'center';
+
+var tracker = {
+	scale: [1.25,1.25, 1.25],
+	update: function(){
+		var t = this;
+		t.pos[0] = t.scene.mpos.x;
+		t.pos[1] = t.scene.mpos.y + 32;
+		t.rot[1] = t.scene.mpos.x / 500;
+		t.rot[0] = -t.scene.mpos.y / 500;
+		t.render();
+	}
+};
+n.blessWith3DBase(tracker, {});
+s.add(tracker);
+
+
+//label
+var textLabel = new n.VText({
+	renderAlways: true,
+	textAlign: align,
+	string: '',
+	pos: [0, -320, 0]
+});
+tracker.add(textLabel);
+
+var updateLabel = function(){
+	var newOrder;
+	currentOrder = (currentOrder + 1) % 6;
+	newOrder = rotOrderList[currentOrder];
+	rotOrder[0] = newOrder[0];
+	rotOrder[1] = newOrder[1];
+	rotOrder[2] = newOrder[2];
+	textLabel.string = 'Click to change rotOrder\nCurrent Order: ' + (currentOrder + 1) + ' / 6 : ' + rotOrder.toString();
+};
+updateLabel();
+
+s.canvas.addEventListener('mousedown', updateLabel, false);
+
+//START Plain Axies
+var yOffset = -128;
+var xOffset = 128;
+var textX = new n.VText({
+	textAlign: align,
+	string: 'X',
+	pos: [-xOffset, yOffset, 0]
+});
+var sphereX = new n.Ob3D(sphereConfig);
+sphereX.update = function(){
+	this.rot[0] += deg * 2;
+	this.render();
+};
+textX.add(sphereX);
+tracker.add(textX);
+
+
+
+var textY = new n.VText({
+	textAlign: align,
+	string: 'Y',
+	pos: [0, yOffset, 0]
+});
+var sphereY = new n.Ob3D(sphereConfig);
+sphereY.update = function(){
+	this.rot[1] += deg * 2;
+	this.render();
+};
+textY.add(sphereY);
+tracker.add(textY);
+
+
+var textZ = new n.VText({
+	textAlign: align,
+	string: 'Z',
+	pos: [xOffset, yOffset, 0]
+});
+var sphereZ = new n.Ob3D(sphereConfig);
+sphereZ.update = function(){
+	this.rot[2] += deg * 2;
+	this.render();
+};
+textZ.add(sphereZ);
+tracker.add(textZ);
+
+//END Plain Axies
+
+
+//START Two Axies
+yOffset = 0;
+var textXY = new n.VText({
+	textAlign: align,
+	string: 'XY',
+	pos: [-xOffset, yOffset, 0]
+});
+var sphereXY = new n.Ob3D(sphereConfig);
+sphereXY.update = function(){
+	this.rot[0] += deg * 2;
+	this.rot[1] += deg * 2;
+	this.render();
+};
+textXY.add(sphereXY);
+tracker.add(textXY);
+
+
+var textXZ = new n.VText({
+	textAlign: align,
+	string: 'XZ',
+	pos: [0, yOffset, 0]
+});
+var sphereXZ = new n.Ob3D(sphereConfig);
+sphereXZ.update = function(){
+	this.rot[0] += deg * 2;
+	this.rot[2] += deg * 2;
+	this.render();
+};
+textXZ.add(sphereXZ);
+tracker.add(textXZ);
+
+
+var textYX = new n.VText({
+	textAlign: align,
+	string: 'YX',
+	pos: [xOffset, yOffset, 0]
+});
+var sphereYX = new n.Ob3D(sphereConfig);
+sphereYX.update = function(){
+	this.rot[1] += deg * 2;
+	this.rot[0] += deg * 2;
+	this.render();
+};
+textYX.add(sphereYX);
+tracker.add(textYX);
+
+
+//NEXT ROW
+yOffset = 128;
+var textZY = new n.VText({
+	textAlign: align,
+	string: 'ZY',
+	pos: [-xOffset, yOffset, 0]
+});
+var sphereZY = new n.Ob3D(sphereConfig);
+sphereZY.update = function(){
+	this.rot[2] += deg * 2;
+	this.rot[1] += deg * 2;
+	this.render();
+};
+textZY.add(sphereZY);
+tracker.add(textZY);
+
+
+var textZX = new n.VText({
+	textAlign: align,
+	string: 'ZX',
+	pos: [0, yOffset, 0]
+});
+var sphereZX = new n.Ob3D(sphereConfig);
+sphereZX.update = function(){
+	this.rot[2] += deg * 2;
+	this.rot[0] += deg * 2;
+	this.render();
+};
+textZX.add(sphereZX);
+tracker.add(textZX);
+
+
+var textYZ = new n.VText({
+	textAlign: align,
+	string: 'YZ',
+	pos: [xOffset, yOffset, 0]
+});
+var sphereYZ = new n.Ob3D(sphereConfig);
+sphereYZ.update = function(){
+	this.rot[1] += deg * 2;
+	this.rot[2] += deg * 2;
+	this.render();
+};
+textYZ.add(sphereYZ);
+tracker.add(textYZ);
+//END Two Axies
+</script>
+</body>
+</html>

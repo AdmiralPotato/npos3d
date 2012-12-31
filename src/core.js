@@ -63,9 +63,12 @@ var clearDebug = function () {
 var NPos3d = NPos3d || {
 	addFunc: function (o) {
 		var t = this, len, i;
+		if(o.parent){ //If the object already has a parent, remove it from that one first.
+			o.parent.remove(o);
+		}
 		if(t.children === undefined){
 			t.children = [];
-		}else{
+		} else {
 			//It is never a good idea to allow an item to be a child of a parent more than once.
 			//Trust me.
 			len = t.children.length;
@@ -75,12 +78,18 @@ var NPos3d = NPos3d || {
 				}
 			}
 		}
-		if(o.parent){ //If the object already has a parent, remove it from that one first.
-			o.parent.remove(o);
-		}
 		if(t.childrenToBeAdded === undefined){
 			t.childrenToBeAdded = [];
+		} else {
+			//Check here too, in case it was added multiple times per frame.
+			len = t.childrenToBeAdded.length;
+			for (i = 0; i < len; i += 1) {
+				if (t.childrenToBeAdded[i] === o) {
+					return false;
+				}
+			}
 		}
+
 		t.childrenToBeAdded.push(o);
 		return true;
 	},
@@ -103,16 +112,35 @@ var NPos3d = NPos3d || {
 		//This function should be assigned to objects in the scene which will be rendered;
 		//Example: myObject.render = NPos3d.renderFunc;
 		var t = this; //should be referring to the object being rendered
-		t.scene.updateTransformedPointCache(t);
-		if (t.renderStyle === 'lines') {
-			t.scene.drawLines(t);
-		}else if (t.renderStyle === 'points') {
-			t.scene.drawPoints(t);
-		}else if (t.renderStyle === 'both') {
-			t.scene.drawLines(t);
-			t.scene.drawPoints(t);
+		t.scene.updateMatrices(t);
+		if(!t.shape || !t.shape.points || !t.shape.points.length){
+			t.transformedPointCache.length = 0;
 		} else {
-			throw 'Invalid renderStyle specified: ' + t.renderStyle;
+			t.scene.updateTransformedPointCache(t);
+			//if there are no points, there is nothing to render with these methods!
+			if(t.transformedPointCache.length > 0){
+				if (
+					t.renderStyle === 'lines' &&
+					//I can't render a line if I don't have at least 2 points and 1 line.
+					t.transformedPointCache.length > 1 &&
+					t.shape.lines.length > 0
+				) {
+					t.scene.drawLines(t);
+				}else if (t.renderStyle === 'points') {
+					t.scene.drawPoints(t);
+				}else if (t.renderStyle === 'both') {
+					if(
+						//I can't render a line if I don't have at least 2 points and 1 line.
+						t.transformedPointCache.length > 1 &&
+						t.shape.lines.length > 0
+					){
+						t.scene.drawLines(t);
+					}
+					t.scene.drawPoints(t);
+				} else {
+					throw 'Invalid renderStyle specified: ' + t.renderStyle;
+				}
+			}
 		}
 	}
 };
@@ -181,127 +209,217 @@ NPos3d.Maths = {
 		var sideAngle = tau - Math.atan2(p3[2], NPos3d.Maths.getVecLength2D(p3[0],p3[1]));
 		return [sideAngle,0,-topAngle];
 	},
-	p3Add: function (a,b) {
-		//an efficient hack to quickly add an offset to a 3D point
-		return [a[0]+b[0], a[1]+b[1], a[2]+b[2]];
+	p3Add: function (a, b, outputPoint) {
+		var o = outputPoint || [];
+		o[0] = a[0] + b[0];
+		o[1] = a[1] + b[1];
+		o[2] = a[2] + b[2];
+		o[3] = a[3]; //preserve point color
+		return o;
 	},
-	p3Sub: function(a,b){
-		return [a[0]-b[0], a[1]-b[1], a[2]-b[2]];
+	p3Sub: function (a, b, outputPoint) {
+		var o = outputPoint || [];
+		o[0] = a[0] - b[0];
+		o[1] = a[1] - b[1];
+		o[2] = a[2] - b[2];
+		o[3] = a[3]; //preserve point color
+		return o;
 	},
-	pointAt: function (o,endPos) {
+	pointAt: function (o, endPos) {
 		var m = NPos3d.Maths, posDiff = m.p3Sub(endPos, o.pos);
 		o.rot = m.getRelativeAngle3D(posDiff);
 	},
-	/*
-	rotatePoint: function (x,y,rot) {
-		var length = Math.sqrt((x * x) + (y * y));
-		var currentRot = Math.atan2(x,y);
-		x = Math.sin(currentRot - rot) * length;
-		y = Math.cos(currentRot - rot) * length;
-		return [x,y];
-	},
-	totalRotationCalculations: 0,
-	p3RotateA: function (p3,rot,order) {
-		//return p3;
-		var m = NPos3d.Maths, x = p3[0], y = p3[1], z = p3[2], xr = rot[0], yr = rot[1], zr = rot[2];
-		//Alright, here's something interesting.
-		//The order you rotate the dimensions is IMPORTANT to rotation animation!
-		//Here's my quick, no math approach to applying that.
-		for (var r = 0; r < order.length; r += 1) {
-			if (order[r] === 0) {
-				//x...
-				if (xr !== 0) {
-					var zy = m.rotatePoint(z,y,xr);
-					z = zy[0];
-					y = zy[1];
-					m.totalRotationCalculations += 1;
-				}
-			}else if (order[r] === 1) {
-				//y...
-				if (yr !== 0) {
-					var xz = m.rotatePoint(x,z,yr);
-					x = xz[0];
-					z = xz[1];
-					m.totalRotationCalculations += 1;
-				}
-			}else if (order[r] === 2) {
-				//z...
-				if (zr !== 0) {
-					var xy = m.rotatePoint(x,y,zr);
-					x = xy[0];
-					y = xy[1];
-					m.totalRotationCalculations += 1;
-				}
-			} else {
-				throw 'up';
-			}
-		}
-		return [x,y,z];
-	},
-	*/
-	__matrix: [
-		[[0,0,0],[0,0,0],[0,0,0]],
-		[[0,0,0],[0,0,0],[0,0,0]],
-		[[0,0,0],[0,0,0],[0,0,0]]
+	__mat4Identity: [
+		1,0,0,0,
+		0,1,0,0,
+		0,0,1,0,
+		0,0,0,1
 	],
-	p3RotMatrix: function (r){
-		var m = NPos3d.Maths,
-			xc = 1,
-			xs = 0,
-			yc = 1,
-			ys = 0,
-			zc = 1,
-			zs = 0;
-		if(r[0] !== 0){
-			xc = cos(r[0]),
-			xs = sin(r[0]);
-		}
-		if(r[1] !== 0){
-			yc = cos(r[1]),
-			ys = sin(r[1]);
-		}
-		if(r[2] !== 0){
-			zc = cos(r[2]),
-			zs = sin(r[2]);
-		}
-		//using the same matrix repeatedly is a lot easier on the garbage collector
-
-		m.__matrix[0][0][0] = 1, m.__matrix[0][0][1] = 0, m.__matrix[0][0][2] = 0,
-		m.__matrix[0][1][0] = 0, m.__matrix[0][1][1] = xc, m.__matrix[0][1][2] = -xs,
-		m.__matrix[0][2][0] = 0, m.__matrix[0][2][1] = xs, m.__matrix[0][2][2] = xc,
-
-		m.__matrix[1][0][0] = yc, m.__matrix[1][0][1] = 0, m.__matrix[1][0][2] = ys,
-		m.__matrix[1][1][0] = 0, m.__matrix[1][1][1] = 1, m.__matrix[1][1][2] = 0,
-		m.__matrix[1][2][0] = -ys, m.__matrix[1][2][1] = 0, m.__matrix[1][2][2] = yc,
-
-		m.__matrix[2][0][0] = zc, m.__matrix[2][0][1] = -zs, m.__matrix[2][0][2] = 0,
-		m.__matrix[2][1][0] = zs, m.__matrix[2][1][1] = zc, m.__matrix[2][1][2] = 0,
-		m.__matrix[2][2][0] = 0, m.__matrix[2][2][1] = 0, m.__matrix[2][2][2] = 1;
-		return m.__matrix;
+	makeMat4: function() {
+		return this.__mat4Identity.slice();
 	},
-	p3MatrixMultiply: function(point, rot, m, order) {
-		var i, x, y, z, len = order.length,
-			p = [point[0],point[1],point[2]]; //because point.slice() hurt performance quite a bit
-		for(i = 0; i < 3; i += 1){ //allows for order to have more than 3 keys, if you feel exotic
-			if(rot[order[i]] !== 0){ //only rotate if this axis is non-zero
-				x = p[0], y = p[1], z = p[2];
-				p[0] = (x * m[order[i]][0][0]) + (y * m[order[i]][0][1]) + (z * m[order[i]][0][2]);
-				p[1] = (x * m[order[i]][1][0]) + (y * m[order[i]][1][1]) + (z * m[order[i]][1][2]);
-				p[2] = (x * m[order[i]][2][0]) + (y * m[order[i]][2][1]) + (z * m[order[i]][2][2]);
+	mat3ToMat4Translation: [
+		[0,1,2],
+		[4,5,6],
+		[8,9,10]
+	],
+	rotOrders: {
+			  /* i, j, k, parity */
+		'0,1,2':[0, 1, 2, 0], /* XYZ */
+		'0,2,1':[0, 2, 1, 1], /* XZY */
+		'1,0,2':[1, 0, 2, 1], /* YXZ */
+		'1,2,0':[1, 2, 0, 0], /* YZX */
+		'2,0,1':[2, 0, 1, 0], /* ZXY */
+		'2,1,0':[2, 1, 0, 1]  /* ZYX */
+	},
+	//The below function mostly converted from Blender source (so much love for team Blender),
+	//plus a little redundancy reduction if no rotation or same as last rotation
+	//Original function was named: eulO_to_mat3 - Construct 3x3 matrix from Euler angles (in radians).
+	//http://projects.blender.org/scm/viewvc.php/trunk/blender/source/blender/blenlib/intern/math_rotation.c?view=markup&root=bf-blender
+	eulerToMat4: function(euler, order, outputMatrix) {
+		var m = this,
+			o = outputMatrix || m.makeMat4(),
+			M = m.mat3ToMat4Translation,
+			eulerString = euler.toString(),
+			orderString = order.toString(),
+			R = m.rotOrders[orderString],
+			i = R[0],
+			j = R[1],
+			k = R[2],
+			parity = R[3],
+			ti, tj, th, ci, cj, ch, si, sj, sh, cc, cs, sc, ss;
+		if(o.euler !== eulerString && o.rotOrder !== orderString) {
+			o.euler = eulerString;
+			o.order = orderString;
+			if(eulerString === '0,0,0'){ //if no rotation, do no work and just return an identity matrix
+				o[00] = 1,
+				o[01] = 0,
+				o[02] = 0,
+				o[04] = 0,
+				o[05] = 1,
+				o[06] = 0,
+				o[08] = 0,
+				o[09] = 0,
+				o[10] = 1;
+			} else {
+				//below here is all of the Blender magic
+				//ti, th, tj are all inverted for NPos3d purposes
+				if (parity) {
+					ti = euler[i];
+					tj = euler[j];
+					th = euler[k];
+				}
+				else {
+					ti = -euler[i];
+					tj = -euler[j];
+					th = -euler[k];
+				}
+
+				ci = m.cos(ti);
+				cj = m.cos(tj);
+				ch = m.cos(th);
+				si = m.sin(ti);
+				sj = m.sin(tj);
+				sh = m.sin(th);
+
+				cc = ci * ch;
+				cs = ci * sh;
+				sc = si * ch;
+				ss = si * sh;
+
+				o[M[i][i]] = cj * ch;
+				o[M[j][i]] = sj * sc - cs;
+				o[M[k][i]] = sj * cc + ss;
+				o[M[i][j]] = cj * sh;
+				o[M[j][j]] = sj * ss + cc;
+				o[M[k][j]] = sj * cs - sc;
+				o[M[i][k]] = -sj;
+				o[M[j][k]] = cj * si;
+				o[M[k][k]] = cj * ci;
 			}
 		}
-		return p;
+		return o;
 	},
-	__lastRot: [0,0,0],
+	mat4Set: function(a, b) { // essentially `a = b`
+		a[00] = b[00], a[01] = b[01], a[02] = b[02], a[03] = b[03],
+		a[04] = b[04], a[05] = b[05], a[06] = b[06], a[07] = b[07],
+		a[08] = b[08], a[09] = b[09], a[10] = b[10], a[11] = b[11],
+		a[12] = b[12], a[13] = b[13], a[14] = b[14], a[15] = b[15],
+		a.euler = b.euler, a.order = b.order;
+		return a;
+	},
+	mat4Mul: function(a, b, outputMatrix) {
+		var a00=a[00],a01=a[01],a02=a[02],a03=a[03],a04=a[04],a05=a[05],a06=a[06],a07=a[07],
+			a08=a[08],a09=a[09],a10=a[10],a11=a[11],a12=a[12],a13=a[13],a14=a[14],a15=a[15],
+			b00=b[00],b01=b[01],b02=b[02],b03=b[03],b04=b[04],b05=b[05],b06=b[06],b07=b[07],
+			b08=b[08],b09=b[09],b10=b[10],b11=b[11],b12=b[12],b13=b[13],b14=b[14],b15=b[15],
+			o = outputMatrix || [];
+		//performance testing this approach versus`o[00] = b[01] * a[01] ...`
+		//on 10 million points indicated that this is a lot faster
+		o[00] = b00 * a00 + b01 * a04 + b02 * a08 + b03 * a12,
+		o[01] = b00 * a01 + b01 * a05 + b02 * a09 + b03 * a13,
+		o[02] = b00 * a02 + b01 * a06 + b02 * a10 + b03 * a14,
+		o[03] = b00 * a03 + b01 * a07 + b02 * a11 + b03 * a15,
+		o[04] = b04 * a00 + b05 * a04 + b06 * a08 + b07 * a12,
+		o[05] = b04 * a01 + b05 * a05 + b06 * a09 + b07 * a13,
+		o[06] = b04 * a02 + b05 * a06 + b06 * a10 + b07 * a14,
+		o[07] = b04 * a03 + b05 * a07 + b06 * a11 + b07 * a15,
+		o[08] = b08 * a00 + b09 * a04 + b10 * a08 + b11 * a12,
+		o[09] = b08 * a01 + b09 * a05 + b10 * a09 + b11 * a13,
+		o[10] = b08 * a02 + b09 * a06 + b10 * a10 + b11 * a14,
+		o[11] = b08 * a03 + b09 * a07 + b10 * a11 + b11 * a15,
+		o[12] = b12 * a00 + b13 * a04 + b14 * a08 + b15 * a12,
+		o[13] = b12 * a01 + b13 * a05 + b14 * a09 + b15 * a13,
+		o[14] = b12 * a02 + b13 * a06 + b14 * a10 + b15 * a14,
+		o[15] = b12 * a03 + b13 * a07 + b14 * a11 + b15 * a15;
+		return o;
+	},
+	mat4P3Translate: function (m, v, outputMatrix) {
+		var o = outputMatrix || this.makeMat4(),
+			aX = m[03],
+			aY = m[07],
+			aZ = m[11],
+			x = v[0],
+			y = v[1],
+			z = v[2];
+		o[03] = aX + x,
+		o[07] = aY + y,
+		o[11] = aZ + z;
+		return o;
+	},
+	mat4P3Scale: function (m, v, outputMatrix) { //scales both rotation and translation
+		var o = outputMatrix || this.makeMat4(),
+			x = v[0],
+			y = v[1],
+			z = v[2],
+			a00 = m[00],
+			a01 = m[01],
+			a02 = m[02],
+			a03 = m[03],
+			a04 = m[04],
+			a05 = m[05],
+			a06 = m[06],
+			a07 = m[07],
+			a08 = m[08],
+			a09 = m[09],
+			a10 = m[10],
+			a11 = m[11];
+		o[00] = a00 * x,
+		o[01] = a01 * x,
+		o[02] = a02 * x,
+		o[03] = a03 * x,
+		o[04] = a04 * y,
+		o[05] = a05 * y,
+		o[06] = a06 * y,
+		o[07] = a07 * y,
+		o[08] = a08 * z,
+		o[09] = a09 * z,
+		o[10] = a10 * z,
+		o[11] = a11 * z;
+		return o;
+	},
+	p3Mat4Mul: function(v, m, outputPoint) {
+		var o = outputPoint || [],
+			x = v[0],
+			y = v[1],
+			z = v[2],
+			color = v[3] || false; //Point Color Preservation - no need to offset or rotate it
+		o[0] = (x * m[00]) + (y * m[01]) + (z * m[02]) + m[03];
+		o[1] = (x * m[04]) + (y * m[05]) + (z * m[06]) + m[07];
+		o[2] = (x * m[08]) + (y * m[09]) + (z * m[10]) + m[11];
+		//o[3] = (x * m[12]) + (y * m[13]) + (z * m[14]) + (w * m[15]);
+		o[3] = color;
+		return o;
+	},
+	__matrix: false,
+	//Probably performance hazardous but Human friendly - use only sparingly.
 	p3Rotate: function (p3, rot, order){
 		var m = NPos3d.Maths;
-		if(m.__lastRot[0] !== rot[0] || m.__lastRot[1] !== rot[1] || m.__lastRot[2] !== rot[2]){
-			m.__lastRot[0] = rot[0],
-			m.__lastRot[1] = rot[1],
-			m.__lastRot[2] = rot[2];
-			m.p3RotMatrix(rot);
+		if(!m.__matrix){
+			m.__matrix = m.makeMat4();
 		}
-		return m.p3MatrixMultiply(p3, rot, m.__matrix, order);
+		m.eulerToMat4(rot, order, m.__matrix);
+		return m.p3Mat4Mul(p3, m.__matrix);
 	},
 	getP3Scaled: function (p3,scale) {
 		//return p3;
@@ -371,6 +489,7 @@ NPos3d.Scene = function (args) {
 	t.canvasId = args.canvasId || 'canvas';
 	t.existingCanvas = args.canvas !== undefined;
 	t.canvas = args.canvas || document.createElement('canvas');
+	t.canvas.style.backgroundColor = args.canvasStyleColor || '#000';
 	t.canvas.id = t.canvasId;
 	t.c = t.canvas.getContext('2d');
 	if (args.canvas === undefined) {
@@ -430,7 +549,7 @@ NPos3d.Scene = function (args) {
 
 	//t.canvas.style.width=  t.w + 'px';
 	//t.canvas.style.height= t.h + 'px';
-	t.canvas.style.backgroundColor = '#000';
+	t.canvas.style.backgroundColor = t.canvasStyleColor;
 	t.cursorPosition = args.canvas !== undefined ? 'absolute' : 'relative';
 	t.mouseHandler = function (e) {
 		//console.dir(e);
@@ -704,32 +823,59 @@ NPos3d.Scene.prototype = {
 			}
 		}
 	},
-	updateTransformedPointCache: function (o) {
-		var m = NPos3d.Maths, i, point, tempPoint;
-		//I see no reason to check whether the rotation/scale is different between processing each point,
-		//so I'll just do that once per frame and have a loop just for rotating the points.
-		if (o.lastRotString !== m.getP3String(o.rot) || o.lastScaleString !== m.getP3String(o.scale)) {
-			//console.log(o.lastRotString);
-			if(o.transformedPointCache.length !== o.shape.points.length){
-				o.transformedPointCache = [];
-				for (i = 0; i < o.shape.points.length; i += 1) {
-					o.transformedPointCache[i] = [0,0,0];
-				}
-			}
-			for (i = 0; i < o.shape.points.length; i += 1) {
-				//to make sure I'm not messing with the original array...
-				point = o.transformedPointCache[i];
-				tempPoint = m.getP3Scaled(o.shape.points[i], o.scale);
-				tempPoint = m.p3Rotate(tempPoint, o.rot, o.rotOrder);
-				point[0] = tempPoint[0];
-				point[1] = tempPoint[1];
-				point[2] = tempPoint[2];
-				point[3] = o.shape.points[i][3] || false;//Point Color Preservation - no need to offset or rotate it
-			}
+	updateMatrices: function(o) {
+		var m = NPos3d.Maths, p = o.parent;
+		//localScale: ,
+		//localRotation: ,
+		//localComposite: ,
+		//globalComposite
 
+		//START updating the object's local matrices
+
+		//scale
+		m.mat4P3Scale(m.__mat4Identity, o.scale, o.matrices.localScale);
+
+		//rotate
+		m.eulerToMat4(o.rot, o.rotOrder, o.matrices.localRotation);
+
+		//composite matrix starts out as scale, no need to multiply
+		m.mat4Set(o.matrices.localComposite, o.matrices.localScale);
+		m.mat4Mul(o.matrices.localComposite, o.matrices.localRotation, o.matrices.localComposite);
+		//no need to multiply the local composite, adding 3 keys will be faster
+		//this is also why we don't need a local localPosition matrix.
+		m.mat4P3Translate(o.matrices.localComposite, o.pos, o.matrices.localComposite);
+
+		//END updating the object's local matrices
+
+		//Multiply the localComposite by the patent's globalComposite to get this object's globalComposite
+		if(p !== undefined && p !== false && p.isScene !== true){
+			m.mat4Mul(o.matrices.localComposite, p.matrices.globalComposite, o.matrices.globalComposite);
+		} else { //it's probably the root object.
+			m.mat4Set(o.matrices.globalComposite, o.matrices.localComposite);
+		}
+
+		m.p3Mat4Mul([0,0,0], o.matrices.globalComposite, o.gPos); //because it rocks to be able to read a global position
+		m.p3Mat4Mul(o.scale, o.matrices.globalComposite, o.gScale); //Would this even work?
+	},
+	updateTransformedPointCache: function (o) {
+		var t = this, m = NPos3d.Maths, i, point, currentGlobalCompositeMatrixString;
+		t.updateMatrices(o);
+		if(o.transformedPointCache.length !== o.shape.points.length){
+			o.transformedPointCache.length = 0; //empty the array, keep the object reference
+			for (i = 0; i < o.shape.points.length; i += 1) {
+				o.transformedPointCache[i] = [0,0,0];
+			}
+			o.lastGlobalCompositeMatrixString = false;
+		}
+		currentGlobalCompositeMatrixString = o.matrices.globalComposite.toString();
+		if (!o.lastGlobalCompositeMatrixString || o.lastGlobalCompositeMatrixString !== currentGlobalCompositeMatrixString) {
+			for (i = 0; i < o.shape.points.length; i += 1) {
+				//to make sure I'm not messing with the original shape array...
+				point = o.transformedPointCache[i];
+				m.p3Mat4Mul(o.shape.points[i], o.matrices.globalComposite, point);
+			}
 			o.boundingBox = m.nGetBounds(o.transformedPointCache);
-			o.lastScaleString = m.getP3String(o.scale);
-			o.lastRotString = m.getP3String(o.rot);
+			o.lastGlobalCompositeMatrixString = currentGlobalCompositeMatrixString;
 		}
 	},
 	lineRenderLoop: function (o) {
@@ -737,14 +883,12 @@ NPos3d.Scene.prototype = {
 		for (i = 0; i < o.transformedPointCache.length; i += 1) {
 			//to make sure I'm not messing with the original array...
 			point = o.transformedPointCache[i];
-			point = m.p3Add(point, o.pos);
-			point = m.p3Add(point, t.invertedCameraPos);
 			computedPointList[i] = point;
 		}
 		for (i = 0; i < o.shape.lines.length; i += 1) {
 			//offset the points by the object's position
-			p3a = computedPointList[o.shape.lines[i][0]];
-			p3b = computedPointList[o.shape.lines[i][1]];
+			p3a = m.p3Add(computedPointList[o.shape.lines[i][0]], t.invertedCameraPos);
+			p3b = m.p3Add(computedPointList[o.shape.lines[i][1]], t.invertedCameraPos);
 
 			//if the depths of the first and second point in the line are not behind the camera...
 			//and the depths of the first and second point in the line are closer than the far plane...
@@ -783,8 +927,8 @@ NPos3d.Scene.prototype = {
 			return;
 		}
 
-		bbMinOffset = m.p3Add(m.p3Add(o.boundingBox[0], o.pos), t.invertedCameraPos);
-		bbMaxOffset = m.p3Add(m.p3Add(o.boundingBox[1], o.pos), t.invertedCameraPos);
+		bbMinOffset = o.boundingBox[0];
+		bbMaxOffset = o.boundingBox[1];
 
 		//Checking to see if any part of the bounding box is in front on the camera and closer than the far plane before bothering to do anything else...
 		if (bbMaxOffset[2] > t.camera.clipFar && bbMinOffset[2] < t.camera.clipNear && bbMaxOffset[2] > t.camera.clipFar && bbMaxOffset[2] < t.camera.clipNear) {
@@ -814,8 +958,8 @@ NPos3d.Scene.prototype = {
 			return;
 		}
 
-		bbMinOffset = m.p3Add(m.p3Add(o.boundingBox[0], o.pos), t.invertedCameraPos);
-		bbMaxOffset = m.p3Add(m.p3Add(o.boundingBox[1], o.pos), t.invertedCameraPos);
+		bbMinOffset = o.boundingBox[0];
+		bbMaxOffset = o.boundingBox[1];
 
 		//Checking to see if any part of the bounding box is in front on the camera and closer than the far plane before bothering to do anything else...
 		if (bbMaxOffset[2] > t.camera.clipFar && bbMinOffset[2] < t.camera.clipNear && bbMaxOffset[2] > t.camera.clipFar && bbMaxOffset[2] < t.camera.clipNear) {
@@ -842,14 +986,11 @@ NPos3d.Scene.prototype = {
 		for (i = 0; i < o.transformedPointCache.length; i += 1) {
 			//to make sure I'm not messing with the original array...
 			point = o.transformedPointCache[i];
-			point = m.p3Add(point, o.pos);
-			point = m.p3Add(point, t.invertedCameraPos);
-			point[3] = o.transformedPointCache[i][3] || false;//Point Color Preservation - no need to offset or rotate it
 			computedPointList[i] = point;
 		}
 		for (i = 0; i < o.transformedPointCache.length; i += 1) {
 			//offset the points by the object's position
-			p3a = computedPointList[i];
+			p3a = m.p3Add(computedPointList[i], t.invertedCameraPos);
 			//if the depth of the point is not behind the camera...
 			//and the depth of the point is closer than the far plane...
 			if (p3a[2] < t.camera.clipNear && p3a[2] > t.camera.clipFar) {
@@ -919,12 +1060,20 @@ NPos3d.Geom.cube = {
 };
 
 NPos3d.blessWith3DBase = function (o,args) {
+	var m = NPos3d.Maths;
 	o.pos = args.pos || [0,0,0];
 	o.rot = args.rot || [0,0,0];
 	o.rotOrder = args.rotOrder || o.rotOrder || [0,1,2];
 	o.scale = args.scale || o.scale || [1,1,1];
-	o.lastScaleString = false;
-	o.lastRotString = false;
+	o.gPos = o.pos.slice(); //global position
+	o.gScale = o.scale.slice(); //global scale
+	o.matrices = {
+		localScale: m.makeMat4(),
+		localRotation: m.makeMat4(),
+		localComposite: m.makeMat4(),
+		globalComposite: m.makeMat4()
+	};
+	o.lastGlobalCompositeMatrixString = false;
 	o.transformedPointCache = [];
 	o.boundingBox = [[0,0,0],[0,0,0]];
 	o.shape = args.shape || o.shape;

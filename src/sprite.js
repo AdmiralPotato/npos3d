@@ -2,11 +2,11 @@ NPos3d.Scene.prototype.drawSprite = function(c,o){
 	c.save();
 	c.translate(o.point2D.x, o.point2D.y);
 	if(o.depthScale){
-		c.scale(o.scale * o.point2D.scale, o.scale * o.point2D.scale);
+		c.scale(o.spriteScale * o.point2D.scale, o.spriteScale * o.point2D.scale);
 	} else {
-		c.scale(o.scale, o.scale);
+		c.scale(o.spriteScale, o.spriteScale);
 	}
-	c.rotate(o.rot);
+	c.rotate(o.spriteRot);
 	if(o.numFrames > 1){
 		o.frameState += 0.3;
 		if(o.frameState >= o.numFrames){
@@ -19,10 +19,11 @@ NPos3d.Scene.prototype.drawSprite = function(c,o){
 	c.restore();
 };
 NPos3d.Scene.prototype.renderSprite = function(o){
-	var t = this,c = t.c;
+	var t = this;
+	t.updateMatrices(o);
 	if(o.loaded){
 		//offset the points by the object's position
-		var p3 = NPos3d.Maths.p3Add(o.pos, t.camera.pos);
+		var p3 = o.gPos;
 		if( p3[2] < t.camera.clipNear && p3[2] > t.camera.clipFar ){
 			o.point2D = t.project3Dto2D(p3); //a convenience measure
 			//Just some basic positional culling... if it's not on screen, don't render it...
@@ -39,13 +40,17 @@ NPos3d.Scene.prototype.renderSprite = function(o){
 		}
 	}
 };
-
+NPos3d.renderSpriteFunc =  function(){
+	this.scene.renderSprite(this);
+}
 
 NPos3d.blessWithSpriteBase = function(o,config){
 	if(!config.path){throw 'You MUST provide an image `path` value on sprite type objects!'};
-	o.pos = config.pos || [0,0,0];
-	o.rot = config.rot || 0;
-	o.scale = config.scale || 1;
+
+	NPos3d.blessWith3DBase(o, config); //Add universal 3D properties to the object first
+
+	o.spriteRot = config.spriteRot || 0;
+	o.spriteScale = config.spriteScale || 1;
 	o.depthScale = config.depthScale || false; //Default behavior: Act as a non-scaling billboard
 	o.numFrames = config.numFrames || 1;
 	o.frameState = o.numFrames;
@@ -64,7 +69,7 @@ NPos3d.blessWithSpriteBase = function(o,config){
 		o.loaded = true;
 		//console.log(t);
 	};
-	o.render = config.render || o.render;
+	o.render = NPos3d.renderSpriteFunc;
 	o.image.src = config.path;
 	return o;
 };
@@ -78,9 +83,6 @@ NPos3d.Sprite3D = function(config){
 
 NPos3d.Sprite3D.prototype = {
 	type: 'Sprite3D',
-	render: function(){
-		this.scene.renderSprite(this);
-	},
 	update:function(){
 		this.render();
 	},

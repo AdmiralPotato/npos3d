@@ -40,9 +40,9 @@ NPos3d.Fx.ExplosionLine = function(args){
 	args.shape = {};
 	NPos3d.blessWith3DBase(t,args);
 	t.o = args.object;
-	t.p1 = args.p1.slice(0); //cloning the points
-	t.p2 = args.p2.slice(0);
-	t.pos = t.o.pos.slice(0);
+	t.pos = t.o.gPos.slice(0);
+	t.p1 = t.subVel(args.p1.slice(0), t.pos); //cloning the points
+	t.p2 = t.subVel(args.p2.slice(0), t.pos);
 	t.midpoint = t.getMidpoint();
 	t.addVel(t.pos,t.midpoint);
 	t.subVel(t.p1,t.midpoint);
@@ -83,11 +83,13 @@ NPos3d.Fx.ExplosionLine.prototype = {
 		o[0] += v[0];
 		o[1] += v[1];
 		o[2] += v[2];
+		return o;
 	},
 	subVel:function(o,v){
 		o[0] -= v[0];
 		o[1] -= v[1];
 		o[2] -= v[2];
+		return o;
 	},
 	update:function(){
 		var t = this,ca = t.colorArray;

@@ -9,7 +9,9 @@
 <script>
 
 var n = NPos3d;
-var scene = new n.Scene();
+var scene = new n.Scene({
+	lineWidth: 4
+});
 var s = scene;
 var c = s.c;
 var q = s.rQ;
@@ -17,41 +19,53 @@ var q = s.rQ;
 var charList = '!\#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~'.split('');
 //charList.reverse();
 
-var myText = new n.VText({string:'!',scale:[10,10,10],textAlign:'center'});
+var commonRotation = [0,0,0];
+var myText = new n.VText({
+	string: '!',
+	fontSize: 64,
+	textAlign: 'center',
+	rot: commonRotation
+});
 s.add(myText);
+var ob1 = new n.Ob3D({
+	shape: myText.shape,
+	pos: [100,0,0],
+	rot: commonRotation
+});
+myText.add(ob1);
+var ob2 = new n.Ob3D({
+	shape: myText.shape,
+	pos: [-100,0,0],
+	rot: commonRotation
+});
+myText.add(ob2);
 var myControl = {
-	pos:[0,0,0],
-	i:0,
-	state:0,
-	color:0,
-	update:function(){
+	i: 0,
+	state: 0,
+	color: 0,
+	update: function(){
+		var t = this,
+			zoom = sin(((s.cy + s.mpos.y) / s.h) * deg * 90) * -500;
 		//console.log(s.mpos);
-		//s.camera.pos = [-s.mpos.x,-s.mpos.y,0];
-		s.camera.pos = [0,0,-s.mpos.y * 4];
 		//myText.rot = [s.mpos.y /100,-s.mpos.x /100,0];
-		this.i+=1;
-		this.color += 10;
-		myText.color = 'hsl(' + this.color + ',100%,50%)';
-		myText.rot = [0,(deg * this.color),0];
-		if(this.i > 36){
-			this.state+=1;
-			if(this.state >= charList.length){
-				this.state = 0;
+		//s.camera.pos = [-s.mpos.x,-s.mpos.y,0];
+		s.camera.pos[2] = zoom;
+		t.i+=1;
+		t.color += 5;
+		myText.color = 'hsl(' + t.color + ',100%,50%)';
+		commonRotation[1] = deg * t.color;
+		if(t.i > 72){
+			t.state+=1;
+			if(t.state >= charList.length){
+				t.state = 0;
 			}
-			myText.string = charList[this.state];
-			this.i=0;
-			this.color = 0;
+			myText.string = charList[t.state];
+			t.i=0;
+			t.color = 0;
 		}
 	}
 }
 s.add(myControl);
-
-var STOPIT = function(){
-	console.log(s.interval);
-	window.clearInterval(s.interval);
-}
-
-//document.onclick = STOPIT;
 
 </script>
 </body>

@@ -13,8 +13,15 @@
 var n = NPos3d;
 var s = new n.Scene({lineWidth: 2});
 
-var rotaryUpdate = function(s){
+var rotaryUpdate = function(){
 	var t = this;
+	if(t === sun){
+		//t.rot[0] = -s.mpos.y * deg / 10;
+		//t.rot[1] = s.mpos.x * deg / 10;
+		t.pos[0] = s.mpos.x;
+		t.pos[1] = s.mpos.y;
+		//t.rot[0] += deg;
+	}
 	t.rot[2] += deg;
 	t.render();
 };
@@ -23,10 +30,22 @@ var mySphereGeom = new n.Geom.Sphere({
 	radius:100,
 	order:'xyz'
 });
+var addAxiesToShape = function(shape){
+	shape.points.push([-300,0,0, '#f00'], [300,0,0, '#f00']);
+	shape.lines.push([shape.points.length -2, shape.points.length -1, '#f00']);
+	shape.points.push([0,-300,0, '#0f0'], [0,300,0, '#0f0']);
+	shape.lines.push([shape.points.length -2, shape.points.length -1, '#0f0']);
+	shape.points.push([0,0,-300, '#00f'], [0,0,300, '#00f']);
+	shape.lines.push([shape.points.length -2, shape.points.length -1, '#00f']);
+};
+addAxiesToShape(mySphereGeom);
+
 var sun = new n.Ob3D({
+	renderAlways: true,
 	shape: mySphereGeom,
-	rot: [deg * -45, 0, 0],
-	rotOrder: [2,0,1],
+	rot: [45 * deg, 0, 0],
+	scale: [1.25, 1.25, 1.25],
+	rotOrder: [0,1,2],
 	color: '#fd0',
 	renderStyle: 'both',
 	pointScale: 5
@@ -36,7 +55,9 @@ s.add(sun);
 
 var erf = new n.Ob3D({
 	shape: mySphereGeom,
-	pos: [200,0,0],
+	pos: [250,0,0],
+	rotOrder: [0,1,2],
+	rot: [45 * deg, 0, 0],
 	scale: [0.25,0.25,0.25],
 	color: '#05f'
 });
@@ -45,30 +66,32 @@ sun.add(erf);
 
 var moon = new n.Ob3D({
 	shape: mySphereGeom,
-	rot: [deg * -45, 0, 0],
-	rotOrder: [2,0,1],
+	//rot: [deg * -45, 0, 0],
+	pos: [300,0,0],
+	rotOrder: [0,1,2],
 	scale: [0.5,0.5,0.5],
 	color: '#ffd'
 });
 moon.update = rotaryUpdate;
 erf.add(moon);
 
+var myText = new n.VText({
+	string: 'Orbit!',
+	textAlign: 'center',
+	pos: [500,0,300],
+	fontSize: 100,
+	color: '#09f'
+});
+moon.add(myText);
 
-//
-//var myText = new n.VText({
-//	string:'CATS!',
-//	scale:[10,10,0],
-//	textAlign:'center',
-//	pos:[100,0,0],
-//	color:'#09f'});
-//mySphere.add(myText);
-//
-//var mySprite = new n.Sprite3D({
-//	path:'../prelim_tests/sprites/megaman_heart_sprite_4x.png',
-//	numFrames:4,
-//	pos:[0,0,-10]
-//});
-//mySphere.add(mySprite);
+var mySprite = new n.Sprite3D({
+	path: '../prelim_tests/sprites/megaman_heart_sprite_4x.png',
+	numFrames: 4,
+	pos: [-500,0,-300],
+	depthScale: true
+});
+
+moon.add(mySprite);
 
 </script>
 </body>

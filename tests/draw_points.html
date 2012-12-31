@@ -16,23 +16,39 @@ var c = s.c;
 var q = s.rQ;
 
 var scroll = 1;
-window.onmousewheel = function(e){scroll=e.wheelDelta;}; //Chrome
-window.addEventListener('DOMMouseScroll',function(e){scroll=e.detail;},false); //FireFox. Wut. You. Smokin.
+window.onmousewheel = function(e){e.preventDefault(); scroll=e.wheelDelta;}; //Chrome
+window.addEventListener('DOMMouseScroll',function(e){e.preventDefault(); scroll=e.detail;},false); //FireFox. Wut. You. Smokin.
 
-var myCube = new n.Ob3D({scale:[10,10,10],renderStyle:'both',pointScale:20,pointStyle:'stroke'});
+var myCube = new n.Ob3D({
+	scale: [10,10,10],
+	renderStyle: 'both',
+	pointScale: 20,
+	pointStyle:'stroke'
+});
 s.add(myCube);
 
-var mySphere = new n.Ob3D({shape:new n.Geom.Sphere({color:'#666'}),scale:[5,5,5],renderStyle:'points',pointScale:6});
+var mySphere = new n.Ob3D({
+	shape: new n.Geom.Sphere({
+		color:'#666'
+	}),
+	scale: [5,5,5],
+	renderStyle: 'points',
+	pointScale:6
+});
 s.add(mySphere);
 
-var myText = new n.VText({string:'Gonna Draw Points!',textAlign:'center',scale:[5,5,5],renderStyle:'both',pointScale:1.5});
+var myText = new n.VText({
+	string: 'Gonna Draw Points!',
+	textAlign: 'center',
+	renderStyle: 'both',
+	pointScale: 1.5
+});
 s.add(myText);
 
 var myControl = {
-	pos:[0,0,0],
-	i:0,
-	state:0,
-	color:0,
+	i: 0,
+	state: 0,
+	color: 0,
 	update:function(){
 		//s.camera.pos = [-s.mpos.x,-s.mpos.y,s.camera.pos[2]];
 		if(scroll !== 0){
@@ -44,19 +60,12 @@ var myControl = {
 		myCube.color = 'hsl(' + this.color + ',100%,50%)';
 		mySphere.color = myCube.color;
 		myText.color = myCube.color;
-		myCube.rot = [s.mpos.y /100,-s.mpos.x /100,0];
+		myCube.rot = [-s.mpos.y / 2 * deg, s.mpos.x / 2 * deg,0];
 		mySphere.rot = myCube.rot;
 		myText.rot = myCube.rot;
 	}
 }
 s.add(myControl);
-
-var STOPIT = function(){
-	console.log(s.interval);
-	window.clearInterval(s.interval);
-}
-
-//document.onclick = STOPIT;
 
 </script>
 </body>

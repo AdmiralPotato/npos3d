@@ -104,13 +104,17 @@ NPos3d.VText = function(args){
 	args = args || {};
 	NPos3d.blessWith3DBase(t,args);
 	t.string = args.string || 'NEED INPUT';
-	t.textAlign = args.textAlign || 'left';
+	t.textAlign = args.textAlign || 'center';
 	t.characterWidth = 2; //This is set static because of the design of the font.
 	t.characterHeight = 4; //This is set static because of the design of the font.
 	t.characterHeightOffset = 2; //This is set static because of the design of the font.
 	t.letterSpacing = args.letterSpacing || 1;
 	t.lineHeight = args.lineHeight || 6;
-	t.color = args.color || '#fff'; //Color is allowed in this ob type because text geom is autogen
+	t.fontSize = args.fontSize|| 32;
+	t.shape = {
+		points:[],
+		lines:[]
+	};
 	t.stringCached = false;
 	t.font = args.font || NPos3d.Geom.font;
 	t.cacheTextGeom();
@@ -119,17 +123,17 @@ NPos3d.VText.prototype = {
 	type: 'VText',
 	getStateString:function(){
 		var t = this;
-		return (t.string + t.textAlign + t.characterWidth + t.letterSpacing + t.lineHeight).toString();
+		return (t.string + t.textAlign + t.characterWidth + t.letterSpacing + t.lineHeight + t.fontSize).toString();
 	},
 	cacheTextGeom:function(){
 		var t = this;
 		//this line is -important-: if any text property changes, new point caches won't be updated without scaling or rotating the object.
-		t.lastRotString = false;
-		t.shape = {
-			color: t.color,
-			points:[],
-			lines:[]
-		};
+		t.lastGlobalCompositeMatrixString = false;
+
+		//clear the geom, but keep the array references
+		t.shape.points.length = 0;
+		t.shape.lines.length = 0;
+
 		var offsetPointCount = 0;
 		var textAlignTypes = {
 			left:{
@@ -144,8 +148,8 @@ NPos3d.VText.prototype = {
 				},
 				spacingOffset: t.letterSpacing
 			},
-			center:{
-				charOffset:function(num){
+			center: {
+				charOffset: function(num){
 					//Plus 2 because each character is 2 wide.
 					return -(num / 2);
 				},
@@ -175,8 +179,8 @@ NPos3d.VText.prototype = {
 						var letter = t.font[thisChar];
 						for(var p = 0; p < letter.points.length; p += 1){
 							t.shape.points.push([
-								letter.points[p][0] + ((t.characterWidth + t.letterSpacing) * offsetCharCount) + offsetSpacing,
-								letter.points[p][1] + (t.lineHeight * lineNum) - t.characterHeightOffset,
+								(letter.points[p][0] + ((t.characterWidth + t.letterSpacing) * offsetCharCount) + offsetSpacing) * t.fontSize / t.characterHeight,
+								(letter.points[p][1] + (t.lineHeight * lineNum) - t.characterHeightOffset) * t.fontSize / t.characterHeight,
 								letter.points[p][2] || 0
 							]);
 						}

@@ -1,0 +1,191 @@
+See the console for output.
+<script>
+	var timer = {
+		q:{},
+		start:function(string){
+			this.q[string] = {
+				start: false,
+				stop: false,
+				diff: false
+			};
+			var rec = this.q[string],
+					now = new Date();
+			rec.start = now.getTime();
+			document.body.innerHTML += 'starting ' + string + '<br>';
+		},
+		stop:function(string){
+			var rec = this.q[string],
+					now = new Date();
+			rec.stop = now.getTime();
+			rec.diff = rec.stop - rec.start;
+			return rec.diff;
+		}
+	};
+
+	var cos = Math.cos, sin = Math.sin, tau = Math.PI * 2, deg = tau / 360;
+	var makeMat4 = function() {
+		var m = [
+			1,0,0,0,
+			0,1,0,0,
+			0,0,1,0,
+			0,0,0,1
+		];
+		return m;
+	};
+	var mat4Translate = function(m, p) {
+		m[03] += p[0],
+		m[07] += p[1],
+		m[11] += p[2];
+	};
+	var mat4Rotate = function(m, r) {
+		var xc = cos(r[0]),
+			xs = sin(r[0]),
+			yc = cos(r[1]),
+			ys = sin(r[1]),
+			zc = cos(r[2]),
+			zs = sin(r[2]);
+//		m[00] = m[00] + yc + zc, m[01] = m[01] - zs, m[02] = m[02] + ys,
+//		m[04] = m[04] + zs, m[05] = m[05] + xc + zc, m[06] = m[06] - xs,
+//		m[08] = m[08] - ys, m[09] = m[09] + xs, m[10] = m[10] + xc + yc;
+//		m[00] = yc + zc,
+//		m[01] = -zs,
+//		m[02] = ys,
+//		m[04] = zs,
+//		m[05] = xc * zc,
+//		m[06] = -xs,
+//		m[08] = -ys,
+//		m[09] = xs,
+//		m[10] = xc * yc;
+
+		//supposedly yxz rotation?
+		//source at bottom of page: http://www.blitz[04]sic.com/Community/posts.php?topic=46914
+		m[00] = yc*xc - xs*xs*ys;
+		m[01] = -xs*yc - xc*xs*ys;
+		m[02] = -xc*ys;
+		m[04] = xc*xs;
+		m[05] = xc*xc;
+		m[06] = -xs;
+		m[08] = xs*xs*yc+ys*xc;
+		m[09] = -xs*ys+xc*xs*yc;
+		m[10] = xc*yc;
+
+	};
+	var mat4MulMat4 = function(a, b, output) {
+		var o = output || [];
+		o[00] = b[00] * a[00] + b[01] * a[04] + b[02] * a[08] + b[03] * a[12],
+		o[01] = b[00] * a[01] + b[01] * a[05] + b[02] * a[09] + b[03] * a[13],
+		o[02] = b[00] * a[02] + b[01] * a[06] + b[02] * a[10] + b[03] * a[14],
+		o[03] = b[00] * a[03] + b[01] * a[07] + b[02] * a[11] + b[03] * a[15],
+		o[04] = b[04] * a[00] + b[05] * a[04] + b[06] * a[08] + b[07] * a[12],
+		o[05] = b[04] * a[01] + b[05] * a[05] + b[06] * a[09] + b[07] * a[13],
+		o[06] = b[04] * a[02] + b[05] * a[06] + b[06] * a[10] + b[07] * a[14],
+		o[07] = b[04] * a[03] + b[05] * a[07] + b[06] * a[11] + b[07] * a[15],
+		o[08] = b[08] * a[00] + b[09] * a[04] + b[10] * a[08] + b[11] * a[12],
+		o[09] = b[08] * a[01] + b[09] * a[05] + b[10] * a[09] + b[11] * a[13],
+		o[10] = b[08] * a[02] + b[09] * a[06] + b[10] * a[10] + b[11] * a[14],
+		o[11] = b[08] * a[03] + b[09] * a[07] + b[10] * a[11] + b[11] * a[15],
+		o[12] = b[12] * a[00] + b[13] * a[04] + b[14] * a[08] + b[15] * a[12],
+		o[13] = b[12] * a[01] + b[13] * a[05] + b[14] * a[09] + b[15] * a[13],
+		o[14] = b[12] * a[02] + b[13] * a[06] + b[14] * a[10] + b[15] * a[14],
+		o[15] = b[12] * a[03] + b[13] * a[07] + b[14] * a[11] + b[15] * a[15];
+		return o;
+	}
+	var mat4MulMat4Alt = function(a, b, output) {
+		var a00=a[00],a01=a[01],a02=a[02],a03=a[03],a04=a[04],a05=a[05],a06=a[06],a07=a[07],
+			a08=a[08],a09=a[09],a10=a[10],a11=a[11],a12=a[12],a13=a[13],a14=a[14],a15=a[15],
+			b00=b[00],b01=b[01],b02=b[02],b03=b[03],b04=b[04],b05=b[05],b06=b[06],b07=b[07],
+			b08=b[08],b09=b[09],b10=b[10],b11=b[11],b12=b[12],b13=b[13],b14=b[14],b15=b[15],
+			o = output || [];
+		o[00] = b00 * a00 + b01 * a04 + b02 * a08 + b03 * a12,
+		o[01] = b00 * a01 + b01 * a05 + b02 * a09 + b03 * a13,
+		o[02] = b00 * a02 + b01 * a06 + b02 * a10 + b03 * a14,
+		o[03] = b00 * a03 + b01 * a07 + b02 * a11 + b03 * a15,
+		o[04] = b04 * a00 + b05 * a04 + b06 * a08 + b07 * a12,
+		o[05] = b04 * a01 + b05 * a05 + b06 * a09 + b07 * a13,
+		o[06] = b04 * a02 + b05 * a06 + b06 * a10 + b07 * a14,
+		o[07] = b04 * a03 + b05 * a07 + b06 * a11 + b07 * a15,
+		o[08] = b08 * a00 + b09 * a04 + b10 * a08 + b11 * a12,
+		o[09] = b08 * a01 + b09 * a05 + b10 * a09 + b11 * a13,
+		o[10] = b08 * a02 + b09 * a06 + b10 * a10 + b11 * a14,
+		o[11] = b08 * a03 + b09 * a07 + b10 * a11 + b11 * a15,
+		o[12] = b12 * a00 + b13 * a04 + b14 * a08 + b15 * a12,
+		o[13] = b12 * a01 + b13 * a05 + b14 * a09 + b15 * a13,
+		o[14] = b12 * a02 + b13 * a06 + b14 * a10 + b15 * a14,
+		o[15] = b12 * a03 + b13 * a07 + b14 * a11 + b15 * a15;
+		return o;
+	}
+	var vec4MulMat4 = function(v, m) {
+		var o = [],
+				x = v[0],
+				y = v[1],
+				z = v[2],
+				w = 1; //v[3]
+		o[0] = (x * m[00]) + (y * m[01]) + (z * m[02]) + m[03];
+		o[1] = (x * m[04]) + (y * m[05]) + (z * m[06]) + m[07];
+		o[2] = (x * m[08]) + (y * m[09]) + (z * m[10]) + m[11];
+		//o[3] = (x * m[12]) + (y * m[13]) + (z * m[14]) + (w * m[15]);
+		return o;
+	};
+
+	var mat4x4SetLeft = function(a, b) {
+		a[00] = b[00], a[01] = b[01], a[02] = b[02], a[03] = b[03],
+		a[04] = b[04], a[05] = b[05], a[06] = b[06], a[07] = b[07],
+		a[08] = b[08], a[09] = b[09], a[10] = b[10], a[11] = b[11],
+		a[12] = b[12], a[13] = b[13], a[14] = b[14], a[15] = b[15];
+		return a;
+	};
+
+	var vec4 = [0, 2, 5, 1];
+	var mat4Translated = makeMat4();
+	var translate = [9, 2, 1];
+	mat4Translate(mat4Translated, translate);
+	var vec4Translated = vec4MulMat4(vec4, mat4Translated);
+	console.log('--TRANSLATION--');
+	console.log('tran in:', translate);
+	console.log('mat4 in:', mat4Translated);
+	console.log('vec4 in:', vec4);
+	console.log('vec4 out:', vec4Translated);
+
+
+	var vec4 = [1, 0, 0, 1];
+	var rot = [0, deg * 90, 0];
+	var mat4Rotated = makeMat4();
+	mat4Rotate(mat4Rotated, rot);
+	var vec4Rotated = vec4MulMat4(vec4, mat4Rotated);
+	console.log('--ROTATION--');
+	console.log('rot deg:', [rot[0] / deg, rot[1] / deg, rot[2] / deg]);
+	console.log('mat4 rot:', mat4Rotated);
+	console.log('vec4 in:', vec4);
+	console.log('vec4 out:', vec4Rotated);
+
+	var mat4RotatedAndTranslated = mat4MulMat4(mat4Translated, mat4Rotated);
+	var vec4RotatedAndTranslated = vec4MulMat4(vec4, mat4RotatedAndTranslated);
+	console.log('--TRANSLATION AND THEN ROTATION--');
+	console.log('mat4 trans:', mat4Translated);
+	console.log('mat4 rot:', mat4Rotated);
+	console.log('mat4 both:', mat4RotatedAndTranslated);
+	console.log('vec4 in:', vec4);
+	console.log('vec4 out:', mat4RotatedAndTranslated);
+
+	console.log('THIS GONNA TAKE A MINUTE.');
+
+	console.log('Starting speed test for mat4MulMat4');
+	timer.start('mat4MulMat4');
+	var i, matA = makeMat4(), matB = makeMat4();
+	mat4Rotate(matB, [deg, deg*2, -deg]);
+	for(i = 0; i < 10000000; i += 1){
+		mat4MulMat4(matA, matB);
+	}
+	console.log(timer.stop('mat4MulMat4'));
+
+	console.log('Starting speed test for mat4MulMat4Alt');
+	timer.start('mat4MulMat4Alt');
+	var i, matA = makeMat4(), matB = makeMat4();
+	mat4Rotate(matB, [deg, deg*2, -deg]);
+	for(i = 0; i < 10000000; i += 1){
+		mat4MulMat4Alt(matA, matB);
+	}
+	console.log(timer.stop('mat4MulMat4Alt'));
+
+
+</script>

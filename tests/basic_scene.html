@@ -14,40 +14,62 @@
 var n = NPos3d;
 var s = new n.Scene();
 
-var myCube = new n.Ob3D();
-myCube.update = function(){
+var addAxiesToShape = function(shape, scale){
+	scale = scale || 100;
+	shape.points.push([0,0,scale, '#00f'], [0,0,-scale, '#00f']);
+	shape.lines.push([shape.points.length -2, shape.points.length -1, '#00f']);
+	shape.points.push([0,scale,0, '#0f0'], [0,-scale,0, '#0f0']);
+	shape.lines.push([shape.points.length -2, shape.points.length -1, '#0f0']);
+	shape.points.push([scale,0,0, '#f00'], [-scale,0,0, '#f00']);
+	shape.lines.push([shape.points.length -2, shape.points.length -1, '#f00']);
+};
+
+var mySphereGeom = new n.Geom.Sphere({radius:50});
+var mySphere = new n.Ob3D({
+	shape: mySphereGeom
+});
+
+addAxiesToShape(mySphereGeom);
+
+mySphere.update = function(){
 	var t = this;
 	t.rot[0] += deg;
 	t.pos[0] = s.mpos.x;
 	t.pos[1] = s.mpos.y;
 	t.render();
 };
-s.add(myCube);
-
-var myText = new n.VText({
-	string:'CATS!',
-	scale:[10,10,0],
-	textAlign:'center',
-	pos:myCube.pos,
-	rot:myCube.rot,
-	color:'#09f'
-});
-s.add(myText);
-
-var mySphereGeom = new n.Geom.Sphere({radius:100});
-var mySphere = new n.Ob3D({
-	shape:mySphereGeom,
-	pos:myCube.pos,
-	rot:myCube.rot
-});
 s.add(mySphere);
 
-var mySprite = new n.Sprite3D({
-	path:'../prelim_tests/sprites/megaman_heart_sprite_4x.png',
-	numFrames:4,
-	pos: myCube.pos
+var myCube = new n.Ob3D({
+	pos: [0, 0, 100]
 });
-s.add(mySprite);
+addAxiesToShape(myCube.shape);
+myCube.update = function(){
+	var t = this;
+	//t.rot[0] += deg;
+	t.rot[2] += deg * 2;
+	t.render();
+};
+mySphere.add(myCube);
+
+
+var myText = new n.VText({
+	string: 'CATS!',
+	pos: [0, 100, 0],
+	rot: [0, 0, deg * -90],
+	textAlign: 'center',
+	color: '#09f'
+});
+addAxiesToShape(myText.shape);
+myCube.add(myText);
+
+var mySprite = new n.Sprite3D({
+	path: '../prelim_tests/sprites/megaman_heart_sprite_4x.png',
+	numFrames: 4,
+	pos: [0, 100, 0],
+	depthScale: false
+});
+myText.add(mySprite);
 
 </script>
 </body>

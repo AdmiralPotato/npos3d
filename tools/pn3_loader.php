@@ -23,8 +23,8 @@ body{
 }
 #controls{
 	position: absolute;
-	top: 0px;
-	right: 0px;
+	top: 0;
+	right: 0;
 	padding: 16px;
 	background-color: rgba(255,255,255,0.1);
 	color: #9f0;
@@ -32,6 +32,7 @@ body{
 	line-height: 16px;
 	font-family: monospace;
 	white-space: pre-wrap;
+	z-index: 1;
 }
 #user_data{
 	display: none;
@@ -69,8 +70,8 @@ var viewControl = {
 	rot:[0,0,0],
 	update:function(){
 	//this.rot[0] += deg*1;
-	this.rot[1] = -deg*s.mpos.x /2;
-	this.rot[0] = deg*s.mpos.y /2;
+	this.rot[1] = deg*s.mpos.x /2;
+	this.rot[0] = -deg*s.mpos.y /2;
 	scene.camera.pos[2] += (scroll/8);
 	scroll = 0;
 	//this.pos[0] = s.mpos.x;
@@ -92,10 +93,9 @@ if(dataImage !== null){
 	var parsedPn3 = new n.Geom.PN3({
 		path:dataImage.src,
 		callback:function(){
-			myShape.lastRotString = parsedPn3;
 			myShape.shape = parsedPn3;
 			console.log(parsedPn3);
-		},
+		}
 	});
 }
 
