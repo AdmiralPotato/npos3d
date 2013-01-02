@@ -789,6 +789,7 @@ NPos3d.Scene.prototype = {
 				t.update();
 				if(t.frameRate !== t.lastFrameRate){ //automatically updates frameRate if updated mid-usage
 					t.stop();
+					t.lastFrameRate = t.frameRate;
 					t.start();
 				}
 			},
