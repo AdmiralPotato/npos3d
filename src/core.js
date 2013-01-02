@@ -485,7 +485,9 @@ NPos3d.Scene = function (args) {
 	t.fullScreen = args.fullScreen === undefined || args.fullScreen === true ? true : false;
 
 	t.isMobile = (/iphone|ipad|ipod|android|blackberry|mini|windows\sce|palm/i.test(navigator.userAgent.toLowerCase()));
-	t.useWindowSize = t.isMobile && /chrome/i.test(navigator.userAgent.toLowerCase()); //is it mobile Chrome?
+	t.oldAndroid = t.isMobile && navigator.userAgent.toLowerCase().indexOf('android 2') !== -1;
+	t.mobileFireFox = t.isMobile && navigator.userAgent.toLowerCase().indexOf('firefox') !== -1;
+	t.useOuterWidth = t.oldAndroid || t.mobileFireFox;
 
 	t.canvasId = args.canvasId || 'canvas';
 	t.existingCanvas = args.canvas !== undefined;
@@ -500,23 +502,17 @@ NPos3d.Scene = function (args) {
 		t.canvas.parentNode.style.margin = 0;
 		t.canvas.parentNode.style.padding = 0;
 		t.canvas.style.display = 'block';
+		t.canvas.style.position = 'fixed';
 		t.canvas.style.top = 0;
 		t.canvas.style.left = 0;
 		if(args.zIndex !== undefined){
 			t.canvas.style.zIndex = args.zIndex;
 		}
-		if (t.isMobile) {
-			if(t.useWindowSize){
-				t.checkWindow = function () {
-					t.w = Math.ceil(window.screen.width / t.pixelScale);
-					t.h = Math.ceil(window.screen.height / t.pixelScale);
-				};
-			} else {
-				t.checkWindow = function () {
-					t.w = Math.ceil(window.outerWidth / t.pixelScale);
-					t.h = Math.ceil(window.outerHeight / t.pixelScale);
-				};
-			}
+		if (t.useOuterWidth) {
+			t.checkWindow = function () {
+				t.w = Math.ceil(window.outerWidth / t.pixelScale);
+				t.h = Math.ceil(window.outerHeight / t.pixelScale);
+			};
 		} else {
 			t.checkWindow = function () {
 				t.w = Math.ceil(window.innerWidth / t.pixelScale);
@@ -548,8 +544,6 @@ NPos3d.Scene = function (args) {
 	t.resize();
 	t.setInvertedCameraPos();
 
-	//t.canvas.style.width=  t.w + 'px';
-	//t.canvas.style.height= t.h + 'px';
 	t.canvas.style.backgroundColor = t.canvasStyleColor;
 	t.cursorPosition = args.canvas !== undefined ? 'absolute' : 'relative';
 	t.mouseHandler = function (e) {
@@ -621,34 +615,45 @@ NPos3d.Scene.prototype = {
 		t.canvas.width = t.w;
 		t.canvas.height = t.h;
 		if (t.pixelScale !== 1) {
-			t.canvas.style.width = t.w*t.pixelScale + 'px';
-			t.canvas.style.height = t.h*t.pixelScale + 'px';
+			t.canvas.style.width = Math.ceil(t.w * t.pixelScale) + 'px';
+			t.canvas.style.height = Math.ceil(t.h * t.pixelScale) + 'px';
+		} else {
+			t.canvas.style.width = t.w + 'px';
+			t.canvas.style.height = t.h + 'px';
 		}
 		t.lw = t.w;
 		t.lh = t.h;
-		//Normally, this function would end here,
-		//but both FireFox and "Web" for Android refuse to allow me to display pages pixel-per-pixel in any sane way.
-		//This does 3 things -
-		//	1: Make the canvas very, very large, which kills performance
-		//	2: Make the render output SUCK
-		//	3: HULK SMASH!!!
-		meta = document.getElementById('vp');
-		if (!meta) {
-			meta = document.createElement('meta');
-			meta.setAttribute('name','viewport');
-			meta.setAttribute('id','vp');
-		}
-		if (meta && meta.parentNode === document.head) {
-			document.head.removeChild(meta);
-		}
-		//var oldSize = subset(window,'innerHeight,innerWidth,outerWidth,outerHeight');
-		meta.setAttribute('content','width=' + t.w + ', user-scalable=0, target-densityDpi=device-dpi');
-		document.head.appendChild(meta);
 		if(t.isMobile){
-			window.scrollTo(0,1);
+			//Normally, this function would end here,
+			//but both FireFox and "Web" for Android refuse to allow me to display pages pixel-per-pixel in any sane way.
+			//This does 3 things -
+			//	1: Make the canvas very, very large, which kills performance
+			//	2: Make the render output SUCK
+			//	3: HULK SMASH!!!
+			meta = document.getElementById('vp');
+			if (!meta) {
+				meta = document.createElement('meta');
+				meta.setAttribute('name','viewport');
+				meta.setAttribute('id','vp');
+			}
+			if (meta && meta.parentNode === document.head) {
+				document.head.removeChild(meta);
+			}
+			//Mobile FireFox: https://developer.mozilla.org/en-US/docs/Mobile/Viewport_meta_tag
+			//Android Viewport reference: http://developer.android.com/guide/webapps/targeting.html#Metadata
+			//Some Actual User testing: http://stackoverflow.com/questions/11345896/full-webpage-and-disabled-zoom-viewport-meta-tag-for-all-mobile-browsers#answer-12270403
+			if(t.mobileFireFox){
+				meta.setAttribute('content','width=' + t.w + ', user-scalable=no, target-densityDpi=device-dpi');
+			} else {
+				meta.setAttribute('content','width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, target-densityDpi=device-dpi');
+			}
+			document.head.appendChild(meta);
+			//used to scroll to remove header on oldAndroid
+			//if(t.fullScreen && t.isMobile && ! t.oldAndroid){
+			//	window.scrollTo(0,1);
+			//}
+			//window.scrollTo(0,0);
 		}
-		//window.scrollTo(0,0);
-		//displayDebug(oldSize);
 	},
 	setInvertedCameraPos: function () {
 		//There is a really, really good reason to have this function.
