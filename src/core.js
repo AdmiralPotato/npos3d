@@ -475,6 +475,7 @@ NPos3d.Scene = function (args) {
 	t.mpos = {x: 0,y: 0};
 	t.camera = args.camera || new NPos3d.Camera();
 	t.frameRate = args.frameRate || 30;
+	t.lastFrameRate = t.frameRate;
 	t.pixelScale = args.pixelScale || 1;
 	t.globalCompositeOperation = args.globalCompositeOperation || 'source-over';
 	t.backgroundColor = args.backgroundColor || 'transparent';
@@ -783,7 +784,16 @@ NPos3d.Scene.prototype = {
 	},
 	start: function () {
 		var t = this;
-		t.interval = setInterval(function () {t.update();}, 1000 / t.frameRate);
+		t.interval = setInterval(
+			function () {
+				t.update();
+				if(t.frameRate !== t.lastFrameRate){ //automatically updates frameRate if updated mid-usage
+					t.stop();
+					t.start();
+				}
+			},
+			1000 / t.frameRate
+		);
 	},
 	stop: function () {
 		clearInterval(this.interval);
