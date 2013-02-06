@@ -1,0 +1,53 @@
+<!doctype html>
+<html>
+<head>
+	<title>Point At</title>
+</head>
+<body>
+<script src="../src/core.js"></script>
+<script>
+	var n = NPos3d,
+		m = n.Maths,
+		s = new n.Scene(),
+		scroll = 0,
+		scrollHandler = function(e) {
+			e.preventDefault(); //OSX 10.7 bouncy scrolling, I loath you
+			scroll = e.detail || e.wheelDelta;
+		};
+	window.addEventListener('mousewheel', scrollHandler, false); //Chrome event binding
+	window.addEventListener('DOMMouseScroll', scrollHandler, false); //FireFox event binding
+
+	var pointer = new n.Ob3D({
+		shape: n.Geom.axies,
+		renderStyle: 'both',
+		pointScale: 2
+	});
+
+	var targetParent = new n.Ob3D({
+		shape: n.Geom.axies,
+		rotOrder: [2,1,0]
+	});
+	var target = new n.Ob3D({
+		pos: [100, 0, 0]
+	});
+
+	var animationController = {
+		update: function() {
+			targetParent.pos[0] = s.mpos.x;
+			targetParent.pos[1] = s.mpos.y;
+			targetParent.pos[2] += scroll;
+			targetParent.rot[2] += deg;
+			targetParent.rot[1] += 0.05 * cos(targetParent.rot[2] * 3);
+			scroll = 0;
+			m.pointAt(pointer, target.gPos);
+		}
+	};
+
+	s.add(pointer);
+	s.add(targetParent);
+	targetParent.add(target);
+	s.add(animationController);
+
+</script>
+</body>
+</html>

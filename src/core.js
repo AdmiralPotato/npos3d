@@ -204,10 +204,11 @@ NPos3d.Maths = {
 	getVecLength2D: function (x,y) {
 		return Math.sqrt(NPos3d.Maths.getSquareVecLength2D(x,y));
 	},
-	getRelativeAngle3D: function (p3) { //DO NOT try to optomize out the use of sqrt in this function!!!
-		var topAngle =  Math.atan2(p3[0], p3[1]);
-		var sideAngle = tau - Math.atan2(p3[2], NPos3d.Maths.getVecLength2D(p3[0],p3[1]));
-		return [sideAngle,0,-topAngle];
+	getRelativeAngle3D: function (p3) { //DO NOT try to optimize out the use of Math.sqrt in this function!!!
+		var topAngle =  Math.atan2(p3[1], p3[0]),
+			length = NPos3d.Maths.getVecLength2D(p3[0], p3[1]),
+			sideAngle = -Math.atan2(p3[2], length);
+		return [ 0, sideAngle, topAngle];
 	},
 	p3Add: function (a, b, outputPoint) {
 		var o = outputPoint || [];
@@ -226,7 +227,12 @@ NPos3d.Maths = {
 		return o;
 	},
 	pointAt: function (o, endPos) {
-		var m = NPos3d.Maths, posDiff = m.p3Sub(endPos, o.pos);
+		var m = NPos3d.Maths,
+			posDiff = m.p3Sub(endPos, o.pos);
+		//works only for this rotOrder at the moment
+		if(o.rotOrder !== [2,1,0]){
+			o.rotOrder = [2,1,0];
+		}
 		o.rot = m.getRelativeAngle3D(posDiff);
 	},
 	__mat4Identity: [
@@ -1058,21 +1064,48 @@ NPos3d.Camera.prototype = {
 	type: 'Camera'
 };
 
-NPos3d.Geom = {};
-
-//The only reason this isn't with the rest of the shapes is because I need to use it inside the prototype of ob3D
-NPos3d.Geom.cube = {
-	points: [
-		[ 10, 10, 10],
-		[ 10, 10,-10],
-		[ 10,-10, 10],
-		[ 10,-10,-10],
-		[-10, 10, 10],
-		[-10, 10,-10],
-		[-10,-10, 10],
-		[-10,-10,-10]
-	],
-	lines: [[0,1],[2,3],[4,5],[6,7],[3,1],[2,0],[7,5],[6,4],[5,1],[7,3],[4,0],[6,2]]
+NPos3d.Geom = {
+	//The only reason this isn't with the rest of the shapes is because I need to use it inside the prototype of ob3D
+	cube: {
+		points: [
+			[ 10, 10, 10],
+			[ 10, 10,-10],
+			[ 10,-10, 10],
+			[ 10,-10,-10],
+			[-10, 10, 10],
+			[-10, 10,-10],
+			[-10,-10, 10],
+			[-10,-10,-10]
+		],
+		lines: [[0,1],[2,3],[4,5],[6,7],[3,1],[2,0],[7,5],[6,4],[5,1],[7,3],[4,0],[6,2]]
+	},
+	axies: {
+		points: [
+			[ 4, 0, 0,'#f00'],
+			[32, 0, 0,'#f00'],
+			[22, 6,-6,'#f00'],
+			[22,-6, 6,'#f00'],
+			[ 0, 4, 0,'#0f0'],
+			[ 0,32, 0,'#0f0'],
+			[ 6,22,-6,'#0f0'],
+			[-6,22, 6,'#0f0'],
+			[ 0, 0, 4,'#00f'],
+			[ 0, 0,32,'#00f'],
+			[-6, 6,22,'#00f'],
+			[ 6,-6,22,'#00f']
+		],
+		lines: [
+			[0,1,'#f00'],
+			[1,2,'#f00'],
+			[1,3,'#f00'],
+			[4,5,'#0f0'],
+			[5,6,'#0f0'],
+			[5,7,'#0f0'],
+			[8,9,'#00f'],
+			[9,10,'#00f'],
+			[9,11,'#00f']
+		]
+	}
 };
 
 NPos3d.blessWith3DBase = function (o,args) {
@@ -1112,7 +1145,6 @@ NPos3d.Ob3D = function (args) {
 	var t = this, type = 'Ob3D';
 	if(t.type !== type){throw 'You must use the `new` keyword when invoking the ' + type + ' constructor.';}
 	args = args || {};
-	if (arguments.length > 1) {throw 'Ob3D expects only one argument, an object with the named configuration values.';}
 	NPos3d.blessWith3DBase(t,args);
 	return this;
 };
