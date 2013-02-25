@@ -228,7 +228,7 @@ NPos3d.Maths = {
 	},
 	pointAt: function (o, endPos) {
 		var m = NPos3d.Maths,
-			posDiff = m.p3Sub(endPos, o.pos);
+			posDiff = m.p3Sub(endPos, o.gPos);
 		//works only for this rotOrder at the moment
 		if(o.rotOrder !== [2,1,0]){
 			o.rotOrder = [2,1,0];
