@@ -12,10 +12,7 @@
 <script>
 
 var n = NPos3d;
-var scene = new n.Scene();
-var s = scene;
-var c = s.c;
-var q = s.rQ;
+var s = new n.Scene();
 
 var scroll = 1;
 window.onmousewheel = function(e){
@@ -35,7 +32,7 @@ var lOffset = {
 	//this.rot[0] += deg*1;
 	this.rot[1] = deg*s.mpos.x /2;
 	this.rot[0] = -deg*s.mpos.y /2;
-	scene.camera.pos[2] += (scroll/8);
+	s.camera.pos[2] += (scroll/8);
 	scroll = 0;
 	//this.pos[0] = s.mpos.x;
 	//this.pos[1] = s.mpos.y;
@@ -71,10 +68,12 @@ var getImageAsMesh = function(imagePath){
 }
 
 var ideaCallback = function(){
-	//console(n.Geom.PN3);
-	myOb.shape = myIdea;
-	myText.string = myIdea.points.length + ' points';
 	//console.log(myIdea);
+	myText.string = myIdea.points.length + ' points';
+	myOb.shape = myIdea;
+	//the following triggers a regen of the object's internal transformedPointCache so that it updates next frame,
+	//so that the user doesn't have to rotate the object before seeing the geometry change
+	myOb.lastGlobalCompositeMatrixString = false;
 }
 var imageList = 'img/heartsub.png,img/heartsub_100.jpg,img/heartsub_90.jpg,img/heartsub_80.jpg,img/heartsub_70.jpg,img/heartsub_60.jpg,img/heartsub_51.jpg,img/heartsub_50.jpg';
 imageList = imageList.split(',');

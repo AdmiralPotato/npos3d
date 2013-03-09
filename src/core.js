@@ -1,65 +1,3 @@
-var subset = function (ob, string) {
-	var output = {}, propList = string.split(','), i;
-	for (i = 0; i < propList.length; i += 1) {
-		output[propList[i]] = ob[propList[i]];
-	}
-	return output;
-};
-
-var get_type = function (input) {
-	if (input === null) {
-		return "[object Null]"; // special case
-	}
-	return Object.prototype.toString.call(input);
-};
-
-var initVal = function () { //A function designed to compensate for lack of function (value = default)
-	var i;
-	if (arguments.length < 1) {
-		throw 'ur doin it wrong. initVal function requires > 1 arguments';
-	}
-	for (i = 0; i < arguments.length; i += 1) {
-		if (arguments[i] !== undefined && arguments[i] !== null) {
-			return arguments[i];
-		}
-	}
-	return arguments[i];
-};
-
-var debug;
-var displayDebug = function (input) {
-	var output = [], keyName;
-	if (get_type(input).match(/Number/i)) {
-		output.push(input + '<br>');
-	} else {
-		output.push(input.constructor.name + '<br>');
-	}
-	for (keyName in input) {
-		if (input.hasOwnProperty(keyName)) {
-			output.push(keyName.toString() + ': ' + get_type(input[keyName]) + ' - ' + input[keyName] + '<br>');
-		}
-	}
-	if (!debug) {
-		debug = document.createElement('pre');
-		debug.style.display = 'block';
-		debug.style.position = 'fixed';
-		debug.style.top = 0;
-		debug.style.left = 0;
-		debug.style.zIndex = 9001;
-		debug.style.fontFamily = 'monospace';
-		debug.style.fontSize = '10px';
-		debug.style.lineHeight = '7px';
-		debug.style.color = 'hsl(' + (Math.random() * 360) + ',100%,50%)';
-		document.body.appendChild(debug);
-	}
-	debug.innerHTML += output.join("\n");
-};
-var clearDebug = function () {
-	if(debug){
-		debug.innerHTML = '';
-	}
-};
-
 var NPos3d = NPos3d || {
 	addFunc: function (o) {
 		var t = this, len, i;
@@ -471,13 +409,77 @@ NPos3d.Maths = {
 	}
 };
 
+NPos3d.Utils = {
+	subset: function (ob, string) {
+		var output = {}, propList = string.split(','), i;
+		for (i = 0; i < propList.length; i += 1) {
+			output[propList[i]] = ob[propList[i]];
+		}
+		return output;
+	},
+	initVal: function () { //A function designed to compensate for lack of function (value = default)
+		var i;
+		if (arguments.length < 1) {
+			throw 'ur doin it wrong. initVal function requires > 1 arguments';
+		}
+		for (i = 0; i < arguments.length; i += 1) {
+			if (arguments[i] !== undefined && arguments[i] !== null) {
+				return arguments[i];
+			}
+		}
+		return arguments[i];
+	},
+	get_type: function (input) {
+		if (input === null) {
+			return "[object Null]"; // special case
+		}
+		return Object.prototype.toString.call(input);
+	},
+	displayDebug: function (input) {
+		var u = NPos3d.Utils, output = [], keyName;
+		if (u.get_type(input).match(/Number/i)) {
+			output.push(input + '<br>');
+		} else {
+			output.push(input.constructor.name + '<br>');
+		}
+		for (keyName in input) {
+			if (input.hasOwnProperty(keyName)) {
+				output.push(keyName.toString() + ': ' + u.get_type(input[keyName]) + ' - ' + input[keyName] + '<br>');
+			}
+		}
+		if (!u.display) {
+			u.display = document.createElement('pre');
+			u.display.style.display = 'block';
+			u.display.style.position = 'fixed';
+			u.display.style.top = 0;
+			u.display.style.left = 0;
+			u.display.style.zIndex = 9001;
+			u.display.style.fontFamily = 'monospace';
+			u.display.style.fontSize = '10px';
+			u.display.style.lineHeight = '7px';
+			u.display.style.whiteSpace = 'pre-wrap';
+			u.display.style.color = 'hsl(' + Math.round(Math.random() * 360) + ',100%,50%)';
+		}
+		document.body.appendChild(u.display);
+		u.display.innerHTML += output.join("\n");
+	},
+	clearDebug: function () {
+		var u = NPos3d.Utils;
+		if(u.display){
+			u.display.innerHTML = '';
+			if(u.display.parentNode === document.body){
+				document.body.removeChild(u.display);
+			}
+		}
+	}
+};
 
 NPos3d.Scene = function (args) {
 	var t = this, type = 'Scene';
 	if(t.type !== type){throw 'You must use the `new` keyword when invoking the ' + type + ' constructor.';}
 	args = args || {};
 
-	t.debug = args.debug || false;
+	t.debugViewport = args.debugViewport || false;
 	t.mpos = {x: 0,y: 0};
 	t.camera = args.camera || new NPos3d.Camera();
 	t.frameRate = args.frameRate || 30;
@@ -490,9 +492,10 @@ NPos3d.Scene = function (args) {
 	t.lineWidth = args.lineWidth || undefined;
 	t.fullScreen = args.fullScreen === undefined || args.fullScreen === true ? true : false;
 
-	t.isMobile = (/iphone|ipad|ipod|android|blackberry|mini|windows\sce|palm/i.test(navigator.userAgent.toLowerCase()));
-	t.oldAndroid = t.isMobile && navigator.userAgent.toLowerCase().indexOf('android 2') !== -1;
-	t.mobileFireFox = t.isMobile && navigator.userAgent.toLowerCase().indexOf('firefox') !== -1;
+	t.oldAndroid = t.isMobile && /android 2/i.test(navigator.userAgent);
+	t.mobileSafari = /iphone|ipad|ipod/i.test(navigator.userAgent);
+	t.isMobile = t.oldAndroid || t.mobileSafari || /android|blackberry|mini|windows\sce|palm/i.test(navigator.userAgent);
+	t.mobileFireFox = t.isMobile && /firefox/i.test(navigator.userAgent);
 	t.useOuterWidth = t.oldAndroid || t.mobileFireFox;
 
 	t.canvasId = args.canvasId || 'canvas';
@@ -613,7 +616,7 @@ NPos3d.Scene.prototype = {
 		window.square = NPos3d.Maths.square;
 	},
 	resize: function () {
-		var t = this, meta;
+		var t = this, meta, ratio;
 		t.cx = Math.floor(t.w/2);
 		t.cy = Math.floor(t.h/2);
 		t.mpos.x = 0;
@@ -650,6 +653,9 @@ NPos3d.Scene.prototype = {
 			//Some Actual User testing: http://stackoverflow.com/questions/11345896/full-webpage-and-disabled-zoom-viewport-meta-tag-for-all-mobile-browsers#answer-12270403
 			if(t.mobileFireFox){
 				meta.setAttribute('content','width=' + t.w + ', user-scalable=no, target-densityDpi=device-dpi');
+			} else if(t.mobileSafari) {
+				ratio = 1 / window.devicePixelRatio;
+				meta.setAttribute('content','width=device-width, initial-scale=' + ratio + ', minimum-scale=' + ratio + ', maximum-scale=' + ratio + ', user-scalable=no');
 			} else {
 				meta.setAttribute('content','width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, target-densityDpi=device-dpi');
 			}
@@ -754,21 +760,22 @@ NPos3d.Scene.prototype = {
 		}
 	},
 	update: function () {
+		var t = this, i, len = t.children.length, child, u = NPos3d.Utils;
 		try{
-			var t = this, i, len = t.children.length, child;
 			t.checkWindow();
 			if (t.w !== t.lw || t.h !== t.lh) {t.resize();}
 			t.setInvertedCameraPos();
 
-			if (t.debug) {
-				var newSize = subset(window,'innerHeight,innerWidth,outerWidth,outerHeight');
+			if (t.debugViewport) {
+				var newSize = u.subset(window,'innerHeight,innerWidth,outerWidth,outerHeight,devicePixelRatio');
 				newSize.screenSizeWidth = window.screen.width;
 				newSize.screenSizeHeight = window.screen.height;
 				newSize.documentElementClientWidth = document.documentElement.clientWidth;
 				newSize.documentElementClientHeight = document.documentElement.clientHeight;
-				//newSize.navigator = navigator.userAgent;
-				clearDebug();
-				displayDebug(newSize);
+				newSize.devicePixelRatio = window.devicePixelRatio;
+				newSize.navigator = navigator.userAgent;
+				u.clearDebug();
+				u.displayDebug(newSize);
 			}
 
 			t.renderInstructionList = []; //the render methods on each object are supposed to populate this array
