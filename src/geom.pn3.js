@@ -131,12 +131,12 @@ NPos3d.Geom.PN3.prototype ={
 };
 
 NPos3d.Geom.MeshToPng = function(args){
-	var t = this, type = 'MeshToPng', key;
+	var t = this, type = 'MeshToPng', u = NPos3d.Utils, key;
 	if(t.type !== type){throw 'You must use the `new` keyword when invoking the ' + type + ' constructor.';}
 	args = args || {};
 
-	t.centerData = initVal(args.centerData, false);
-	t.scaleData = initVal(args.scaleData, true);
+	t.centerData = u.initVal(args.centerData, false);
+	t.scaleData = u.initVal(args.scaleData, true);
 
 
 
@@ -265,7 +265,7 @@ NPos3d.Geom.MeshToPng = function(args){
 	//#### END STORING LINE DATA! ####
 
 	t.c.putImageData(t.imageData,0,0);
-	t.displayImage = initVal(args.displayImage,true);
+	t.displayImage = u.initVal(args.displayImage,true);
 	if(t.displayImage){
 		t.image = new Image();
 		t.image.src=t.canvas.toDataURL();

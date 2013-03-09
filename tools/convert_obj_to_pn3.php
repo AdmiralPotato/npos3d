@@ -69,39 +69,46 @@ if(!isset($_POST['scaled'])){$_POST['scaled'] = 1;}
 <script src="convert_obj_to_shape.js"></script>
 <script>
 
-var n = NPos3d;
-var scene = new n.Scene();
-var s = scene;
-var c = s.c;
-var q = s.rQ;
+var n = NPos3d,
+	s = new n.Scene(),
+	scroll = 0,
+	scrollHandler = function(e) {
+		e.preventDefault(); //OSX 10.7 bouncy scrolling, I loath you
+		scroll = e.detail || e.wheelDelta;
+	};
+window.addEventListener('mousewheel', scrollHandler, false); //Chrome event binding
+window.addEventListener('DOMMouseScroll', scrollHandler, false); //FireFox event binding
 
-var scroll = 1;
-window.onmousewheel = function(e){scroll=e.wheelDelta;}; //Chrome
-window.addEventListener('DOMMouseScroll',function(e){scroll=e.detail * -100;},false); //FireFox. Wut. You. Smokin.
-var viewControl = {
-	pos:[0,0,0],
-	rot:[0,0,0],
-	update:function(){
-	//this.rot[0] += deg*1;
-	this.rot[1] = deg*s.mpos.x /2;
-	this.rot[0] = -deg*s.mpos.y /2;
-	scene.camera.pos[2] += (scroll/8);
+var myCube = new n.Ob3D({
+	scale: [15,15,15],
+	color: '#f00',
+	renderAlways: true
+});
+myCube.update = function(){
+	var t = this;
+	t.rot[1] = deg * s.mpos.x /2;
+	t.rot[0] = -deg * s.mpos.y /2;
+	s.camera.pos[2] += scroll / 8;
 	scroll = 0;
-	//this.pos[0] = s.mpos.x;
-	//this.pos[1] = s.mpos.y;
-	}
-}
-s.add(viewControl);
-
-var myCube = new n.Ob3D({pos:viewControl.pos, rot:viewControl.rot, scale:[15,15,15],renderAlways:true});
-myCube.shape.color='#f00';
+	t.render();
+};
 s.add(myCube);
-var myShape = new n.Ob3D({pos:viewControl.pos, rot:viewControl.rot, scale:[300,300,300],renderAlways:true,renderStyle:'points',pointStyle:'stroke'});
-s.add(myShape);
-var myText = new n.VText({pos:viewControl.pos, rot:viewControl.rot, scale:[2,2,2],renderAlways:true,string:'Upload an\nOBJ file',textAlign:'center'});
-s.add(myText);
-//var myPn3 = new n.Ob3D({pos:viewControl.pos, rot:viewControl.rot, scale:[30,30,30],renderAlways:true});
-//s.add(myPn3);
+
+var myShape = new n.Ob3D({
+	scale: [20,20,20],
+	renderAlways: true,
+	renderStyle: 'points',
+	pointStyle: 'stroke'
+});
+myCube.add(myShape);
+
+var myText = new n.VText({
+	scale: [0.1,0.1,0.1],
+	renderAlways: true,
+	string: 'Upload an\nOBJ file',
+	textAlign: 'center'
+});
+myCube.add(myText);
 
 var dataHolder = document.getElementById('user_data');
 if(dataHolder.value.length > 10){ //Why ten? Meh. Dunno. No way is an OBJ that short, no way is whitespace that long.
