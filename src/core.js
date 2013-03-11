@@ -492,9 +492,11 @@ NPos3d.Scene = function (args) {
 	t.lineWidth = args.lineWidth || undefined;
 	t.fullScreen = args.fullScreen === undefined || args.fullScreen === true ? true : false;
 
-	t.oldAndroid = t.isMobile && /android 2/i.test(navigator.userAgent);
+	t.oldAndroid = /android 2/i.test(navigator.userAgent);
 	t.mobileSafari = /iphone|ipad|ipod/i.test(navigator.userAgent);
 	t.isMobile = t.oldAndroid || t.mobileSafari || /android|blackberry|mini|windows\sce|palm/i.test(navigator.userAgent);
+	t.isChrome = /Chrome/i.test(navigator.userAgent);
+	t.newChromeMobile = t.isMobile && t.isChrome && parseInt(navigator.userAgent.match(/Chrome\/(\d*)/i)[1]) > 18;
 	t.mobileFireFox = t.isMobile && /firefox/i.test(navigator.userAgent);
 	t.useOuterWidth = t.oldAndroid || t.mobileFireFox;
 
@@ -653,7 +655,7 @@ NPos3d.Scene.prototype = {
 			//Some Actual User testing: http://stackoverflow.com/questions/11345896/full-webpage-and-disabled-zoom-viewport-meta-tag-for-all-mobile-browsers#answer-12270403
 			if(t.mobileFireFox){
 				meta.setAttribute('content','width=' + t.w + ', user-scalable=no, target-densityDpi=device-dpi');
-			} else if(t.mobileSafari) {
+			} else if(t.mobileSafari || t.newChromeMobile) {
 				ratio = 1 / window.devicePixelRatio;
 				meta.setAttribute('content','width=device-width, initial-scale=' + ratio + ', minimum-scale=' + ratio + ', maximum-scale=' + ratio + ', user-scalable=no');
 			} else {
