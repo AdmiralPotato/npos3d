@@ -10,27 +10,32 @@ NPos3d.Fx.Explosion = function(args){
 		throw 'Fx.Explosion requires an Ob3D as the value for the `object` argument in the passed configuration object.';
 	}
 	t.o = args.object;
-	t.lines = t.o.shape.lines;
-	t.points = t.o.transformedPointCache;
-	t.children = [];
-	//console.log(t);
-	t.lines.forEach(function(line){
-		var p1 = t.points[line[0]],
-			p2 = t.points[line[1]],
-			color = t.o.color || t.o.shape.color || line[2] || t.o.scene.strokeStyle;
-		t.children.push(new NPos3d.Fx.ExplosionLine({
-			p1:p1,
-			p2:p2,
-			object:t.o,
-			colorArray: NPos3d.Utils.Color.colorStringToRGBAArray(color)
-		}));
-	});
-	t.o.destroy();
+	t.o.add(t);
 	return t;
 };
 
 NPos3d.Fx.Explosion.prototype = {
-	type: 'Explosion'
+	type: 'Explosion',
+	update: function() {
+		var t = this;
+		t.lines = t.o.shape.lines;
+		t.points = t.o.transformedPointCache;
+		//console.log(t);
+		t.lines.forEach(function(line){
+			var p1 = t.points[line[0]],
+				p2 = t.points[line[1]],
+				color = t.o.color || t.o.shape.color || line[2] || t.o.scene.strokeStyle;
+			t.scene.add(new NPos3d.Fx.ExplosionLine({
+				p1:p1,
+				p2:p2,
+				object:t.o,
+				colorArray: NPos3d.Utils.Color.colorStringToRGBAArray(color)
+			}));
+		});
+		t.o.destroy();
+		t.destroy();
+	},
+	destroy: NPos3d.destroyFunc
 };
 
 NPos3d.Fx.ExplosionLine = function(args){
