@@ -9,8 +9,11 @@ NPos3d.Fx.Explosion = function(args){
 	if(!args.object || !args.object.shape.lines || !args.object.transformedPointCache){
 		throw 'Fx.Explosion requires an Ob3D as the value for the `object` argument in the passed configuration object.';
 	}
+	if(!args.scene || args.scene.type !== 'Scene'){
+		throw 'Fx.Explosion requires a Scene as the value for the `scene` argument in the passed configuration object.';
+	}
 	t.o = args.object;
-	t.o.add(t);
+	args.scene.add(t);
 	return t;
 };
 
@@ -29,6 +32,7 @@ NPos3d.Fx.Explosion.prototype = {
 				p1:p1,
 				p2:p2,
 				object:t.o,
+				scene:t.scene,
 				colorArray: NPos3d.Utils.Color.colorStringToRGBAArray(color)
 			}));
 		});
@@ -45,6 +49,7 @@ NPos3d.Fx.ExplosionLine = function(args){
 	args.shape = {};
 	NPos3d.blessWith3DBase(t,args);
 	t.o = args.object;
+	t.scene = args.scene;
 	t.pos = t.o.gPos.slice(0);
 	t.p1 = t.subVel(args.p1.slice(0), t.pos); //cloning the points
 	t.p2 = t.subVel(args.p2.slice(0), t.pos);
@@ -59,7 +64,7 @@ NPos3d.Fx.ExplosionLine = function(args){
 	t.rotVel = args.rotVel || [t.rneg(2) * deg,t.rneg(2) * deg,t.rneg(2) * deg];
 	t.lifespan = 50 + t.rint(100);
 	t.life = t.lifespan;
-	t.o.scene.add(t);
+	t.scene.add(t);
 	return t;
 };
 
