@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Lathe</title>
+<style>
+*{
+	margin: 0;
+	padding: 0;
+	border: 0;
+	outline: 0;
+	font-family: inherit;
+	font-size: inherit;
+	line-height: inherit;
+	color: inherit;
+}
+html, body{
+	height: 100%;
+}
+body{
+	font-family: sans-serif;
+	font-size: 12px;
+	line-height: 24px;
+	color: #fff;
+}
+#holder{
+	display: block;
+	padding: 16px;
+	width: 128px;
+	left: 50%;
+	margin-left: -80px;
+	position: fixed;
+	z-index: 2;
+}
+input{
+	display: block;
+	width: 128px;
+	margin: 8px auto;
+	padding: 0 16px;
+	color: #ddd;
+	background-color: #222;
+	border: 1px solid #690;
+	text-align: center;
+}
+input[type="text"]{
+	width: 94px;
+}
+input:hover{
+	color: #fff;
+	background-color: #333;
+	border: 1px solid #9f0;
+}
+input:active{
+	color: #ff0;
+	background-color: #555;
+}
+</style>
+</head>
+<body>
+<div id="holder">
+	<input type="button" id="action" value="Edit" />
+	<input type="button" id="clear" value="Clear" style="display: none;" />
+	<input type="text" id="segments" value="36" style="display: none;" />
+</div>
+<script src="../src/core.js"></script>
+<script src="../src/geom.lathe.js"></script>
+<script>
+
+var n = NPos3d;
+var s = new n.Scene({
+	lineWidth: 1,
+	globalCompositeOperation: 'lighter'
+});
+var myShape = {
+	points: [
+		[50, -100, 0],
+		[50, -50, 0],
+		[90, -35, 0],
+		[100, 0, 0],
+		[90, 35, 0],
+		[50, 50, 0],
+		[50, 100, 0]
+	],
+	lines: [
+		[0,1],
+		[1,2],
+		[2,3],
+		[3,4],
+		[4,5],
+		[5,6]
+	]
+};
+
+var editMode = false;
+var myControl = {
+	rot: [0,0,0],
+	update: function() {
+		var t = this;
+		if(editMode){
+			t.rot[1] = 0;
+			t.rot[0] = 0;
+
+		} else {
+			t.rot[1] = s.mpos.x / 50;
+			t.rot[0] = -s.mpos.y / 50;
+		}
+	}
+};
+s.add(myControl);
+
+var myOb = new n.Ob3D({
+	renderStyle: 'both',
+	shape: myShape,
+	rot: myControl.rot,
+	pos: [-150, 0, 0]
+});
+var myLineOb = new n.Ob3D({
+	renderStyle: 'lines',
+	shape: {
+		points:[
+			[0,-100,0],
+			[0,100,0]
+		],
+		lines: [[0,1]]
+	}
+});
+s.add(myOb);
+myOb.add(myLineOb);
+
+var myLatheShape = new n.Geom.Lathe({
+	shape: myShape,
+	segments: 36,
+	axis: 1
+});
+var myLatheOb = new n.Ob3D({
+	renderStyle: 'both',
+	shape: myLatheShape,
+	rot: myControl.rot,
+	pos: [150, 0, 0],
+	color: 'rgba(64,127,0,0.75)'
+
+});
+s.add(myLatheOb);
+
+
+
+
+var actionButton = document.getElementById('action');
+var clearButton = document.getElementById('clear');
+var segmentsInput = document.getElementById('segments');
+
+
+var actionClickHandler = function(){
+	editMode = !editMode;
+	if(editMode){
+		actionButton.value = 'Spin';
+		clearButton.style.display = segmentsInput.style.display = 'block';
+	} else {
+		actionButton.value = 'Edit';
+		clearButton.style.display = segmentsInput.style.display = 'none';
+	}
+};
+var clearClickHandler = function(){
+	myShape.points.length = 0;
+	myShape.lines.length = 0;
+	myLatheShape.generate();
+};
+var canvasClickHandler = function() {
+	if(editMode){
+		myShape.points.push([
+			s.mpos.x - myOb.pos[0],
+			s.mpos.y - myOb.pos[1],
+			0
+		]);
+		if(myShape.points.length > 1){
+			myShape.lines.push([
+				myShape.points.length - 2,
+				myShape.points.length - 1
+			]);
+		}
+		myLatheShape.generate();
+	}
+};
+var segmentChangeHandler = function() {
+	if(editMode){
+		myLatheShape.segments = parseInt(segmentsInput.value);
+		myLatheShape.generate();
+	}
+};
+
+actionButton.addEventListener('mousedown', actionClickHandler, false);
+clearButton.addEventListener('mousedown', clearClickHandler, false);
+s.canvas.addEventListener('mousedown', canvasClickHandler, false);
+document.addEventListener('keyup', segmentChangeHandler, false);
+
+</script>
+</body>
+</html>
