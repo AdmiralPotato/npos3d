@@ -559,38 +559,37 @@ NPos3d.Scene = function (args) {
 	t.canvas.style.backgroundColor = t.canvasStyleColor;
 	t.cursorPosition = args.canvas !== undefined ? 'absolute' : 'relative';
 	t.mouseHandler = function (e) {
-		//console.dir(e);
-		//displayDebug(e.target);
+		var canvasOffsetX = 0,
+			canvasOffsetY = 0,
+			ratio = window.devicePixelRatio,
+			pointX = 0,
+			pointY = 0;
 		if(e.target === t.canvas || e.target === window){
 			e.preventDefault();
 		}
-		var canvasOffset = {x: 0,y: 0};
 		if (!t.fullScreen) {
 			var offset = t.canvas.getBoundingClientRect();
-			canvasOffset.x = offset.left;
-			canvasOffset.y = offset.top;
+			canvasOffsetX = offset.left;
+			canvasOffsetY = offset.top;
 		}
 		if (e.touches && e.touches.length) {
-			//t.mpos.x = e.touches[0].screenX - t.cx;
-			//t.mpos.y = e.touches[0].screenY - t.cy;
-			if(t.cursorPosition === 'absolute'){
-				t.mpos.x = Math.ceil(((e.touches[0].screenX - canvasOffset.x) / t.pixelScale) - t.cx);
-				t.mpos.y = Math.ceil(((e.touches[0].screenY - canvasOffset.y) / t.pixelScale) - t.cy);
-			}else{
-				t.mpos.x = Math.ceil((e.touches[0].screenX / t.pixelScale) - t.cx);
-				t.mpos.y = Math.ceil((e.touches[0].screenY / t.pixelScale) - t.cy);
-			}
+			pointX = e.touches[0].screenX;
+			pointY = e.touches[0].screenY;
 		} else {
-			//t.mpos.x = e.pageX - t.cx;
-			//t.mpos.y = e.pageY - t.cy;
-			if(t.cursorPosition === 'absolute'){
-				t.mpos.x = Math.ceil(((e.clientX - canvasOffset.x) / t.pixelScale) - t.cx);
-				t.mpos.y = Math.ceil(((e.clientY - canvasOffset.y) / t.pixelScale) - t.cy);
-			}else{
-				t.mpos.x = Math.ceil((e.clientX / t.pixelScale) - t.cx);
-				t.mpos.y = Math.ceil((e.clientY / t.pixelScale) - t.cy);
-			}
+			pointX = e.clientX;
+			pointY = e.clientY;
 		}
+		if(ratio !== undefined || ratio !== 1){
+			pointX *= ratio;
+			pointY *= ratio;
+		}
+		if(t.cursorPosition === 'absolute'){
+			pointX -= canvasOffsetX;
+			pointY -= canvasOffsetY;
+		}
+		t.mpos.x = Math.ceil((pointX / t.pixelScale) - t.cx);
+		t.mpos.y = Math.ceil((pointY / t.pixelScale) - t.cy);
+		//console.log(t.mpos.x, t.mpos.y);
 	};
 	window.addEventListener('mousemove',t.mouseHandler,false);
 	window.addEventListener('touchstart',t.mouseHandler,false);
