@@ -119,7 +119,7 @@ All renderable objects have a common set of properties that you may assign throu
 * `rotOrder` - 3 key array specifying the order in which an object will be rotated along its axies. Only combinations of values such as `[0, 2, 1]`, `[2, 1, 0]` are valid. Default: `[0, 1, 2]`
 * `scale` - 3 key array specifying relative scale of the object's children objects and any local geometry. Default: `[1, 1, 1]`
 * `color` - String representing any valid CSS color. Accepts: hsl, hsla, rgb, rgba, 6 digit hex, 3 digit hex. Default: undefined, but will use the value `#fff` from the parent Scene if not otherwise configured
-* `shape` - More on this in the <#custom-geometry> section
+* `shape` - More on this in the '[Custom Geometry](#custom-geometry)' section
 * `renderStyle` - String specifying 1 of 3 styles that object's geometry may be rendered: Default: `lines`
 	* `lines` - Only the Geometry object's `lines` will be rendered. The additional `lineWidth` will be respected if `renderStyle` is set to `lines` or `both`.
 	* `points` - Only the Geometry object's `points` will be rendered. The additional properties `pointScale` and `pointStyle` will be respected if `renderStyle` is set to `points` or `both`.
@@ -216,7 +216,7 @@ scene.add(myShip);
 Now that we have some static, non-moving objects in our scene, let's add some animation and interactivity. All animatable properties on an object are public and can be changed either by it's local `update` method, or by external forces.
 
 ##### Animating a renderable object via its own update method
-I'll use the existing `myTriangle` object defined in the 'Custom Geometry' section to illustrate this concept. To follow the convention I've been using throughout the NPos3d engine thus far, I define the local variable `t` to represent the renderable object itself for use inside of each of its member functions. __It is important to remember to invoke the local object's `render` method at the end of the definition of its `update` method, or neither it nor any of its children will display at all!__
+I'll use the existing `myTriangle` object defined in the '[Custom Geometry](#custom-geometry)' section to illustrate this concept. To follow the convention I've been using throughout the NPos3d engine thus far, I define the local variable `t` to represent the renderable object itself for use inside of each of its member functions. __It is important to remember to invoke the local object's `render` method at the end of the definition of its `update` method, or neither it nor any of its children will display at all!__
 
 ```javascript
 myTriangle.update = function() { //update methods are invoked with zero arguments
@@ -227,7 +227,7 @@ myTriangle.update = function() { //update methods are invoked with zero argument
 ```
 
 ##### Animating one renderable object from another object's update method
-I'll use the existing `myShip` object defined in the 'Custom Geometry' section to illustrate this concept. Sometimes it makes more sense to have one 'animation controller' object manage the state of one or more external renderable objects. In this case, I will use and object literal with an update method. This `animationController` object has no renderable properties, so it will not be displayed, but adding it to the Scene ensures that its update method is invoked once per frame.
+I'll use the existing `myShip` object defined in the '[Custom Geometry](#custom-geometry)' section to illustrate this concept. Sometimes it makes more sense to have one 'animation controller' object manage the state of one or more external renderable objects. In this case, I will use and object literal with an update method. This `animationController` object has no renderable properties, so it will not be displayed, but adding it to the Scene ensures that its update method is invoked once per frame.
 
 For external reference, the <a href="http://codepen.io/AdmiralPotato/pen/LtEnC" target="_blank">3D ROFLCopter</a> demo over at CodePen is a great example of this concept put to good use.
 
