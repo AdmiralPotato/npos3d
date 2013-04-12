@@ -57,26 +57,21 @@ var NPos3d = NPos3d || {
 			t.scene.updateTransformedPointCache(t);
 			//if there are no points, there is nothing to render with these methods!
 			if(t.transformedPointCache.length > 0){
-				if (t.renderStyle === 'lines') {
+				if (t.renderStyle === 'both' || t.renderStyle === 'lines') {
 					if(
 						//I can't render a line if I don't have at least 2 points and 1 line.
 						t.transformedPointCache.length > 1 &&
+						t.shape.lines !== undefined &&
+						typeof t.shape.lines.length === 'number' &&
 						t.shape.lines.length > 0
 					) {
 						t.scene.drawLines(t);
 					}
-				}else if (t.renderStyle === 'points') {
+				}
+				if (t.renderStyle === 'both' || t.renderStyle === 'points') {
 					t.scene.drawPoints(t);
-				}else if (t.renderStyle === 'both') {
-					if(
-						//I can't render a line if I don't have at least 2 points and 1 line.
-						t.transformedPointCache.length > 1 &&
-						t.shape.lines.length > 0
-					){
-						t.scene.drawLines(t);
-					}
-					t.scene.drawPoints(t);
-				} else {
+				}
+				if(t.renderStyle !== 'both' && t.renderStyle !== 'lines' && t.renderStyle !== 'points') {
 					throw 'Invalid renderStyle specified: ' + t.renderStyle;
 				}
 			}
