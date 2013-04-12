@@ -71,6 +71,7 @@ Currently, there is no complete build of all of the optional modules for the eng
 <script src="https://raw.github.com/AdmiralPotato/npos3d/master/src/geom.circle.js"></script>
 <script src="https://raw.github.com/AdmiralPotato/npos3d/master/src/geom.lathe.js"></script>
 <script src="https://raw.github.com/AdmiralPotato/npos3d/master/src/geom.sphere.js"></script>
+<script src="https://raw.github.com/AdmiralPotato/npos3d/master/src/geom.twist.js"></script>
 <script src="https://raw.github.com/AdmiralPotato/npos3d/master/src/layout.js"></script>
 <script src="https://raw.github.com/AdmiralPotato/npos3d/master/src/sprite.js"></script>
 <script src="https://raw.github.com/AdmiralPotato/npos3d/master/src/utils.color.js"></script>

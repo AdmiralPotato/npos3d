@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Twist</title>
+<style>
+*{
+	margin: 0;
+	padding: 0;
+	border: 0;
+	outline: 0;
+	font-family: inherit;
+	font-size: inherit;
+	line-height: inherit;
+	color: inherit;
+}
+html, body{
+	height: 100%;
+}
+body{
+	font-family: sans-serif;
+	font-size: 12px;
+	line-height: 24px;
+	color: #fff;
+}
+#holder{
+	display: block;
+	padding: 16px;
+	width: 256px;
+	left: 50%;
+	margin-left: -148px;
+	position: fixed;
+	z-index: 2;
+}
+input{
+	display: block;
+	width: 128px;
+	margin: 8px auto;
+	padding: 0 16px;
+	color: #ddd;
+	background-color: #222;
+	border: 1px solid #690;
+	text-align: center;
+}
+input[type="text"]{
+	width: 94px;
+}
+input:hover{
+	color: #fff;
+	background-color: #333;
+	border: 1px solid #9f0;
+}
+input:active{
+	color: #ff0;
+	background-color: #555;
+}
+label{
+	float: left;
+	border: 1px solid #333;
+	background-color: #222;
+	width: 94px;
+	margin: 8px auto;
+	padding: 0 8px;
+	text-align: right;
+}
+</style>
+</head>
+<body>
+<div id="holder">
+	<label for="degrees">Degrees</label>
+	<input type="text" id="degrees" name="degrees" value="180"/>
+</div>
+<script src="../src/core.js"></script>
+<script src="../src/font.js"></script>
+<script src="../src/geom.twist.js"></script>
+<script>
+
+var n = NPos3d,
+	s = new n.Scene({
+		globalCompositeOperation: 'lighter'
+	});
+
+var myText = new n.VText({
+	string: 'Can YOU do the ~Twist~?'
+});
+
+var myTwistedText = new n.Geom.Twist({
+	shape: myText.shape,
+	axis: 0
+});
+
+var degreesInput = document.getElementById('degrees');
+
+var myOb = new n.Ob3D({
+	renderStyle: 'both',
+	shape: myTwistedText,
+	renderAlways: true,
+	color: '#6f0'
+});
+s.add(myOb);
+
+
+var myControl = {
+	angle: 0,
+	rot: [0,0,0],
+	update: function() {
+		var t = this;
+		myOb.rot[1] = s.mpos.x / 100;
+		myOb.rot[0] = -s.mpos.y / 100;
+		myTwistedText.factor = degreesInput.value * deg * cos(t.angle * deg);
+		myTwistedText.offset = -myTwistedText.factor;
+		myTwistedText.generate();
+		myOb.lastGlobalCompositeMatrixString = false;
+		t.angle += 1;
+		t.angle %= 360;
+	}
+};
+s.add(myControl);
+
+</script>
+</body>
+</html>
