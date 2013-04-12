@@ -7,11 +7,7 @@ NPos3d.Geom.Lathe = function(args) {
 		typeof args.shape.points.length !== 'number'
 	){ throw type + ' constructor requires the that the configuration object contains a `shape` property containing an object with a `points` array.'; }
 	t.shape = args.shape;
-	if(args.axis === 0){
-		t.axis = 0;
-	} else {
-		t.axis = args.axis || 1; //y axis
-	}
+	t.axis = args.axis === 0 ? 0 : args.axis || 1;
 	t.segments = args.segments || 12;
 	t.frac = args.frac || tau;
 	t.points = [];

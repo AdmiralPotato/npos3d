@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Lathe</title>
+<style>
+*{
+	margin: 0;
+	padding: 0;
+	border: 0;
+	outline: 0;
+	font-family: inherit;
+	font-size: inherit;
+	line-height: inherit;
+	color: inherit;
+}
+html, body{
+	height: 100%;
+}
+body{
+	font-family: sans-serif;
+	font-size: 12px;
+	line-height: 24px;
+	color: #fff;
+}
+#holder{
+	display: block;
+	padding: 16px 0;
+	width: 552px;
+	left: 50%;
+	margin-left: -256px;
+	position: fixed;
+	z-index: 2;
+	line-height: 0;
+	font-size: 0;
+}
+input, select{
+	line-height: 24px;
+	font-size: 12px;
+	display: inline-block;
+	width: 128px;
+	margin: 8px 8px 0 0;
+	padding: 0 16px;
+	color: #ddd;
+	background-color: #222;
+	border: 1px solid #690;
+	text-align: center;
+	clear: right;
+}
+input[type="text"]{
+	width: 94px;
+}
+input:hover{
+	color: #fff;
+	background-color: #333;
+	border: 1px solid #9f0;
+}
+input:active{
+	color: #ff0;
+	background-color: #555;
+}
+label{
+	font-size: 12px;
+	line-height: 24px;
+	display: inline-block;
+	border: 1px solid #333;
+	background-color: #222;
+	width: 110px;
+	margin: 8px 8px 0 0;
+	padding: 0 8px;
+	text-align: right;
+}
+</style>
+</head>
+<body>
+<div id="holder">
+	<input type="button" id="action" value="Edit" />
+	<div id="editSettings" style="display: none;">
+		<input type="button" id="clear" value="Clear" /><br>
+		<label for="latheAxis">Lathe Axis</label>
+		<select id="latheAxis" name="latheAxis" value="1" >
+			<option>0</option>
+			<option>1</option>
+			<option selected>2</option>
+		</select>
+		<label for="latheSegments">Lathe Segments</label>
+		<input type="text" id="latheSegments" name="latheSegments" value="36" /><br>
+		<label for="twistAxis">Twist Axis</label>
+		<select id="twistAxis" name="twistAxis" value="1" >
+			<option>0</option>
+			<option selected>1</option>
+			<option>2</option>
+		</select>
+		<label for="twistDegrees">Twist Degrees</label>
+		<input type="text" id="twistDegrees" name="twistDegrees" value="180" />
+	</div>
+
+</div>
+<script src="../src/core.js"></script>
+<script src="../src/geom.lathe.js"></script>
+<script src="../src/geom.twist.js"></script>
+<script>
+
+var n = NPos3d;
+var s = new n.Scene({
+	lineWidth: 1,
+	globalCompositeOperation: 'lighter'
+});
+var myShape = {
+	"points":[
+		[30,-90,0],
+		[-40,-40,0],
+		[20,-10,0],
+		[-70,40,0],
+		[90,80,0],
+		[-20,100,0]
+	],
+	"lines":[[0,1],[1,2],[2,3],[3,4],[4,5]]
+};
+
+var editMode = false;
+
+
+
+var myOb = new n.Ob3D({
+	renderStyle: 'both',
+	renderAlways: true,
+	shape: myShape,
+	pos: [-150, 0, 0]
+});
+var myLineOb = new n.Ob3D({
+	renderStyle: 'lines',
+	shape: {
+		points:[
+			[0,-100,0],
+			[0,100,0]
+		],
+		lines: [[0,1]]
+	}
+});
+s.add(myOb);
+myOb.add(myLineOb);
+
+var myLatheShape = new n.Geom.Lathe({
+	shape: myShape
+});
+var myTwistedLatheShape = new n.Geom.Twist({
+	shape: myLatheShape
+})
+var myTwistedLatheOb = new n.Ob3D({
+	renderStyle: 'both',
+	renderAlways: true,
+	shape: myTwistedLatheShape,
+	rot: myOb.rot,
+	pos: [150, 0, 0],
+	color: 'rgba(64,127,0,0.75)'
+});
+s.add(myTwistedLatheOb);
+
+var latheAxisInput = document.getElementById('latheAxis');
+var latheSegmentsInput = document.getElementById('latheSegments');
+var twistAxisInput = document.getElementById('twistAxis');
+var twistDegreesInput = document.getElementById('twistDegrees');
+
+var myControl = {
+	angle: 0,
+	lastNumSegments: 0,
+	lastLatheAxis: 1,
+	update: function() {
+		var t = this,
+			numSegments = parseInt(latheSegmentsInput.value),
+			latheAxis = parseInt(latheAxisInput.value);
+		if(numSegments !== t.lastNumSegments || latheAxis !== t.lastLatheAxis){
+			t.lastNumSegments = numSegments;
+			t.lastLatheAxis = latheAxis;
+
+			myLatheShape.segments = numSegments;
+			myLatheShape.axis = latheAxis;
+			myLatheShape.generate();
+		}
+		if(editMode){
+			myOb.rot[1] = 0;
+			myOb.rot[0] = 0;
+		} else {
+			myOb.rot[1] = s.mpos.x / 50;
+			myOb.rot[0] = -s.mpos.y / 50;
+		}
+		myTwistedLatheShape.axis = parseInt(twistAxisInput.value);
+		myTwistedLatheShape.factor = parseFloat(twistDegreesInput.value) * deg * cos(t.angle * deg);
+		myTwistedLatheShape.offset = -myTwistedLatheShape.factor;
+		myTwistedLatheShape.generate();
+		myTwistedLatheOb.lastGlobalCompositeMatrixString = false;
+		t.angle += 1;
+		t.angle %= 360;
+	}
+};
+s.add(myControl);
+
+
+var actionButton = document.getElementById('action');
+var clearButton = document.getElementById('clear');
+var editSettings = document.getElementById('editSettings');
+
+
+var actionClickHandler = function(){
+	editMode = !editMode;
+	if(editMode){
+		actionButton.value = 'Spin';
+		editSettings.style.display = 'block';
+	} else {
+		actionButton.value = 'Edit';
+		editSettings.style.display = 'none';
+	}
+};
+var clearClickHandler = function(){
+	myShape.points.length = 0;
+	myShape.lines.length = 0;
+	myLatheShape.generate();
+};
+var canvasClickHandler = function() {
+	if(editMode){
+		myShape.points.push([
+			s.mpos.x - myOb.pos[0],
+			s.mpos.y - myOb.pos[1],
+			0
+		]);
+		if(myShape.points.length > 1){
+			myShape.lines.push([
+				myShape.points.length - 2,
+				myShape.points.length - 1
+			]);
+		}
+		myLatheShape.generate();
+	}
+};
+actionButton.addEventListener('mousedown', actionClickHandler, false);
+clearButton.addEventListener('mousedown', clearClickHandler, false);
+s.canvas.addEventListener('mousedown', canvasClickHandler, false);
+
+</script>
+</body>
+</html>
