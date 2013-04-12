@@ -16,7 +16,8 @@ There are only a few steps involved in the setup of an NPos3d powered toy.
 2. Create a Scene
 3. Create Objects
 4. Add those objects to the Scene, or parent them to other objects that are attached to the Scene
-5. Profit.
+5. ...
+6. Profit.
 
 #### Pulling in the sources
  It is reccommended that you put these script tags at the bottom of your HTML file, just above the closing `</body>` tag. You may then follow these script tags with the script tag which contains the code that you will use to set up your scene and define its interactivity. There is no need to wrap any of your scene setup inside of a document.onload or jQuery onload function if you order your script tags in this manner.
@@ -68,6 +69,7 @@ Currently, there is no complete build of all of the optional modules for the eng
 <script src="https://raw.github.com/AdmiralPotato/npos3d/master/src/fx.explosion.js"></script>
 <script src="https://raw.github.com/AdmiralPotato/npos3d/master/src/fx.tween.js"></script>
 <script src="https://raw.github.com/AdmiralPotato/npos3d/master/src/geom.circle.js"></script>
+<script src="https://raw.github.com/AdmiralPotato/npos3d/master/src/geom.lathe.js"></script>
 <script src="https://raw.github.com/AdmiralPotato/npos3d/master/src/geom.sphere.js"></script>
 <script src="https://raw.github.com/AdmiralPotato/npos3d/master/src/layout.js"></script>
 <script src="https://raw.github.com/AdmiralPotato/npos3d/master/src/sprite.js"></script>
