@@ -556,7 +556,7 @@ NPos3d.Scene = function (args) {
 	t.mouseHandler = function (e) {
 		var canvasOffsetX = 0,
 			canvasOffsetY = 0,
-			ratio = window.devicePixelRatio,
+			ratio = window.devicePixelRatio || 1,
 			pointX = 0,
 			pointY = 0;
 		if(e.target === t.canvas || e.target === window){
@@ -651,7 +651,7 @@ NPos3d.Scene.prototype = {
 			if(t.mobileFireFox){
 				meta.setAttribute('content','width=' + t.w + ', user-scalable=no, target-densityDpi=device-dpi');
 			} else if(t.mobileSafari || t.newChromeMobile) {
-				ratio = 1 / window.devicePixelRatio;
+				ratio = 1 / (window.devicePixelRatio || 1);
 				meta.setAttribute('content','width=device-width, initial-scale=' + ratio + ', minimum-scale=' + ratio + ', maximum-scale=' + ratio + ', user-scalable=no');
 			} else {
 				meta.setAttribute('content','width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, target-densityDpi=device-dpi');
@@ -769,7 +769,7 @@ NPos3d.Scene.prototype = {
 				newSize.screenSizeHeight = window.screen.height;
 				newSize.documentElementClientWidth = document.documentElement.clientWidth;
 				newSize.documentElementClientHeight = document.documentElement.clientHeight;
-				newSize.devicePixelRatio = window.devicePixelRatio;
+				newSize.devicePixelRatio = window.devicePixelRatio || 1;
 				newSize.navigator = navigator.userAgent;
 				u.clearDebug();
 				u.displayDebug(newSize);
