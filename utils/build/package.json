@@ -1,0 +1,12 @@
+{
+	"name": "npos3d-builder",
+	"version": "0.0.1",
+	"dependencies": {
+		"gear": "*",
+		"gear-lib": "*",
+		"requirejs": "*"
+	},
+	"scripts": {
+		"build": "node build.js"
+	}
+}

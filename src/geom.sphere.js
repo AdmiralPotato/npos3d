@@ -64,4 +64,4 @@ NPos3d.Geom.Sphere = function(args){
 		}
 	}
 	return o;
-}
+};

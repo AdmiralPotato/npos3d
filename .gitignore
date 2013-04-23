@@ -6,3 +6,5 @@ tests/img/heartsub_anim.mov
 npos3d.iml
 
 .idea
+
+node_modules
