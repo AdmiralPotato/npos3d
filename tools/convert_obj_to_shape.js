@@ -34,124 +34,160 @@ function array_unique(ar){
 }
 
 var justGiveMeData = function(url,callbackFunction,options){
-	var params = options || {};
+	options = options || {};
 	if(! window.XMLHttpRequest){throw 'STOP USING EXPLORER';}
 	var xhr = new XMLHttpRequest();
 	xhr.onreadystatechange = function(){
 		//console.log(xhr);
 		if(xhr.readyState === 4){
-			callbackFunction(xhr.responseText,params);
+			callbackFunction(xhr.responseText,options);
 		}
 	}
 	xhr.open('GET', url+'?cacheKill='+Math.round(Math.random() * 999999).toString(), true);
 	xhr.send();
-}
+};
 
 //Why? Let me tell you why. Because javascript's built-in array.sort() thinks 1,10,100,2,3
 var whyDoINeedToWriteANumericSortingFunction = function(a,b){return a - b;}
 var whyDoINeedToWriteANumericSortingFunctionForA2dArray = function(a,b){return a[0] - b[0];}
 
-var objToShapeParser = function(string,options){
+var objToShapeParser = function(objString, options) {
 	//console.log(string);
-	var params = options || {};
-	var mode = params.mode || 'shape'; //shape OR font
-	var exportScale = params.exportScale || 1;
-	var output = [];
-	var linesOfText = string.split("\n");
-	var objectList = {};
-	var obRef;
-	var pointNumOffset = 1; //starts at 1 so when subtracted from an array.length, the key is still zero
-	var lastObRef;
-	var createObject = function(params){
+	options = options || {};
+	var mode = options.mode || 'shape', //shape OR font
+		meshNameExtraSeparator = options.meshNameExtraSeparator || mode === 'font' ? '_Plane.' : false,
+		meshNameColorSeparator = options.meshNameColorSeparator || false,
+		meshNameColorSingleReg = new RegExp('/' + meshNameColorSeparator + '/'),
+		exportScale = options.exportScale || 1,
+		output = [],
+		meshList = {},
+		currentMeshName,
+		pointNumOffset = 1, //starts at 1 so when subtracted from an array.length, the key is still zero
+		instructionStringList = objString.split("\n"),
+		instructonIndex,
+		instructonString,
+		instructionArgs,
+		instructionName,
+		pointIndex,
+		line,
+		meshIndex,
+		meshNameList = [],
+		meshName;
+
+	var createObject = function(unparsedMeshName) { //this function needs to be context aware, so it is defined in this closure
+		//Creating the new object to put lines and points into!
+		var meshName = unparsedMeshName,
+			meshNameColorSplit,
+			mesh = {
+				points:[],
+				lines:[]
+			};
+
 		//WTF1: THE NEXT LINE IS REALLY, REALLY IMPORTANT TO DO BEFORE CREATING THE NEXT OBJECT.
 		//OBJ STANDARD PRACTICE IS TO COUNT THE TOTAL POINTS IN A FILE AND USE THE ABSOLUTE POINT NUM IN THE POLY REFERENCE
 		//I NEED TO COUNT HOW MANY POINTS WERE IN THE LAST OBJECT TO USE THAT AS MY OFFSET BECAUSE I COUNT THE POINTS IN MY OBJECTS STARTING FROM 0!
 		//Check that this isn't the first object.
-		if(obRef !== undefined){
-			pointNumOffset += objectList[obRef].points.length;
+		if(currentMeshName !== undefined){
+			pointNumOffset += meshList[currentMeshName].points.length;
+		};
+
+		//In older versions of Blender and other apps, the OBJ object name may come in as 'objectName_meshName',
+		//which may be undesirable, so you may set options.meshNameExtraSeparator to '_' to clean the name up.
+		if(meshNameExtraSeparator !== false){
+			meshName = meshName.split(meshNameExtraSeparator)[0];
 		}
 
-		//Creating the new object to put lines and points into!
-		//In Blender, you can have multiple `objects` in your scene that reference the same mesh.
-		//The object name as it comes to here is objectName_meshName, so I split by _
-		//And just because I feel like it, I'm storing the intended color for the object in its name
-		//so example: greeCube-0f0_cubeMesh : turns into obRef = 'greeCube'; objectColor = '0f0';
-		if(mode === 'shape'){
-			var geomsep = params[0].split('_');
-			if(geomsep.length > 2){
-				//Really important to note here: replace(/_/,'&&&') is only nailing the first underscore.
-				//replace(/_/g,'&&&') would nail all underscores.
-				geomsep = params[0].replace(/_/,'&&&').split('_');
+		//You may also assign the color property for a mesh via its object name, by assigning a value to
+		//options.meshNameColorSeparator, such as '-', then in your modeling app, you would name your object with
+		//and valid CSS color string after that separator character.
+
+		//Below are some example object names with color
+		//hex color example: 'greeCube-#0f0_cubeMesh'
+		//    yields meshName = 'greeCube'; color = '#0f0';
+		//rgba color example: 'fadedBlueSphere-rgba(0,0,255,0.5)_Sphere'
+		//    yields meshName = 'fadedBlueSphere'; color = 'rgba(0,0,255,0.5)';
+		if(meshNameColorSeparator !== false){
+			meshNameColorSplit = meshName.split(meshNameColorSeparator);
+			if(meshNameColorSplit.length > 2){ //oops, someone got sloppy in their mesh naming - correcting for that
+				meshNameColorSplit = meshName.replace(meshNameColorSingleReg,'&&&').split(meshNameColorSeparator);
 			}
-			var objectNameFromBlender = geomsep[0].replace('&&&','_').split('-');
-			var objectColor = objectNameFromBlender[1] || 'f00';
-		}else if(mode === 'font'){
-			//But fonts aren't usually multi-color, and '-' is a character, so no more color
-			var objectNameFromBlender = params[0].split('_Plane.')[0];
+			if(meshNameColorSplit.length > 1){
+				meshName = meshNameColorSplit[0];
+				mesh.color = meshNameColorSplit[1];
+			}
 		}
-		obRef = objectNameFromBlender[0];
-		objectList[obRef] = {
-			//color:'#'+objectColor,
-			points:[],
-			lines:[]
-		};
-	}
-	for(var i = 0; i < linesOfText.length; i += 1){
-		var lineOfText = linesOfText[i];
+
+		currentMeshName = meshName;
+		meshList[currentMeshName] = mesh;
+	};
+	for(instructonIndex = 0; instructonIndex < instructionStringList.length; instructonIndex += 1){
 		//I have no why some OBJ exporters would use multiple spaces, but some do...?
-		lineOfText = lineOfText.split('  ').join(' ');
-		var args = lineOfText.split(' ');
-		var action = args[0];
-		args.splice(0,1);
-		var params = args;
-		if(action === 'o'){
-			createObject(params);
+		instructonString = instructionStringList[instructonIndex].split('  ').join(' ');
+		instructionArgs = instructonString.split(' ');
+		instructionName = instructionArgs[0];
+		instructionArgs.splice(0,1); //removes instructionName
+		if(instructionName === 'o'){ //Create Object
+			createObject(instructionArgs[0]);
 		}
-		if(action === 'v'){
-			if(obRef === undefined){ //Just checking to see if the OBJ creator was smart enough to create an object first
+		if(instructionName === 'v'){ //Create Vertex
+			if(currentMeshName === undefined){ //Just checking to see if the OBJ creator was smart enough to create an object first
 				createObject('unnamedObject');
 			}
-			//objectList[obRef].points.push([(parseFloat(params[0])*10),(parseFloat(params[1])*10),(parseFloat(params[2])*10)]);
-			//because I want to flip from Blender's default export orientation...
-			//By the way, it -is- in thoeory possible to have a 3D font. I'll wait for that though.
+			//Blender's default OBJ export orientation is Y up, -Z forward at the moment, so I'm pushing
+			//the vertex axies in the order of [0,2,1] because I want to compensate for that odd default.
 			if(mode === 'shape'){
 				//3D Data
-				objectList[obRef].points.push([(parseFloat(params[0])*exportScale),(parseFloat(params[2])*exportScale),(parseFloat(params[1])*exportScale)]);
+				meshList[currentMeshName].points.push([
+					(parseFloat(instructionArgs[0])*exportScale),
+					(parseFloat(instructionArgs[2])*exportScale),
+					(parseFloat(instructionArgs[1])*exportScale)
+				]);
 			}else if(mode === 'font'){
 				//2D Data
-				objectList[obRef].points.push([(parseFloat(params[0])*exportScale),(parseFloat(params[2])*exportScale)]);
+				//By the way, it -is- in theory possible to have a 3D font. I'll wait for that though.
+				meshList[currentMeshName].points.push([
+					(parseFloat(instructionArgs[0])*exportScale),
+					(parseFloat(instructionArgs[2])*exportScale)
+				]);
 			}
 		}
-		if(action === 'f'){
+		if(instructionName === 'f'){ //Create Face
 			//See note WTF1 above to understand the pointNumOffset variable
-			for(var pointNum = 0; pointNum < (params.length -1); pointNum += 1){
-				var line = [parseInt(params[pointNum]) - pointNumOffset, parseInt(params[pointNum +1]) - pointNumOffset];
+			for(pointIndex = 1; pointIndex < instructionArgs.length; pointIndex += 1){
+				line = [
+					parseInt(instructionArgs[pointIndex -1]) - pointNumOffset,
+					parseInt(instructionArgs[pointIndex]) - pointNumOffset
+				];
 				//Why do I sort the array literal before pushing it into the set? So I can compare easily by join() later.
 				line.sort(whyDoINeedToWriteANumericSortingFunction);
-				objectList[obRef].lines.push(line);
+				meshList[currentMeshName].lines.push(line);
 			}
 			//It took me a long time to figure this out; Filled polys autoclose; Line segments don't.
-			var closingLine = [parseInt(params[0]) - pointNumOffset, parseInt(params[params.length -1]) - pointNumOffset];
-			closingLine.sort(whyDoINeedToWriteANumericSortingFunction);
-			objectList[obRef].lines.push(closingLine);
+			//This is the last line segment in a closed poly.
+			line = [
+				parseInt(instructionArgs[0]) - pointNumOffset,
+				parseInt(instructionArgs[instructionArgs.length -1]) - pointNumOffset
+			];
+			line.sort(whyDoINeedToWriteANumericSortingFunction);
+			meshList[currentMeshName].lines.push(line);
 		}
 	}
 
 	//Alphabetizing the output(for pretty) and killing duplicate lines(in case of overlap from exported faces)
-	var objectNameList = [];
-	for(var property in objectList){
-		if(objectList.hasOwnProperty(property)){
-			//console.log(objectList[property]);
-			objectNameList.push(property);
-			objectList[property].lines = array_unique(objectList[property].lines);
-			objectList[property].lines.sort(whyDoINeedToWriteANumericSortingFunctionForA2dArray);
+
+	for(meshName in meshList){
+		if(meshList.hasOwnProperty(meshName)){
+			//console.log(meshList[property]);
+			meshNameList.push(meshName);
+			meshList[meshName].lines = array_unique(meshList[meshName].lines);
+			meshList[meshName].lines.sort(whyDoINeedToWriteANumericSortingFunctionForA2dArray);
 		}
 	}
-	objectNameList.sort();
-	for(var i = 0; i < objectNameList.length; i++){
-		var property = objectNameList[i];
+	meshNameList.sort();
+	for(meshIndex = 0; meshIndex < meshNameList.length; meshIndex++){
+		meshName = meshNameList[meshIndex];
 		//console.log(property);
-		output.push("\t" + JSON.stringify(property) + ':' + JSON.stringify(objectList[property]));
+		output.push("\t" + JSON.stringify(meshName) + ':' + JSON.stringify(meshList[meshName]));
 	}
 
 	//quick and dirty output. Oh yeah.
@@ -159,6 +195,6 @@ var objToShapeParser = function(string,options){
 	var formattedOutput = "{\n";
 	formattedOutput += output.join(",\n");
 	formattedOutput += "\n}";
-	//console.log(objectList);
+	//console.log(meshList);
 	return formattedOutput;
-}
+};
