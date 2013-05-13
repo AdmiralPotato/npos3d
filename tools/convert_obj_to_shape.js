@@ -55,7 +55,7 @@ var objToShapeParser = function(objString, options) {
 	//console.log(string);
 	options = options || {};
 	var mode = options.mode || 'shape', //shape OR font
-		meshNameExtraSeparator = options.meshNameExtraSeparator || mode === 'font' ? '_Plane.' : false,
+		meshNameExtraSeparator = options.meshNameExtraSeparator || (mode === 'font' ? '_Plane.' : false),
 		meshNameColorSeparator = options.meshNameColorSeparator || false,
 		meshNameColorSingleReg = new RegExp('/' + meshNameColorSeparator + '/'),
 		exportScale = options.exportScale || 1,
@@ -74,7 +74,7 @@ var objToShapeParser = function(objString, options) {
 		meshNameList = [],
 		meshName;
 
-	var createObject = function(unparsedMeshName) { //this function needs to be context aware, so it is defined in this closure
+	var createMeshObject = function(unparsedMeshName) { //this function needs to be context aware, so it is defined in this closure
 		//Creating the new object to put lines and points into!
 		var meshName = unparsedMeshName,
 			meshNameColorSplit,
@@ -127,11 +127,11 @@ var objToShapeParser = function(objString, options) {
 		instructionName = instructionArgs[0];
 		instructionArgs.splice(0,1); //removes instructionName
 		if(instructionName === 'o'){ //Create Object
-			createObject(instructionArgs[0]);
+			createMeshObject(instructionArgs[0]);
 		}
 		if(instructionName === 'v'){ //Create Vertex
 			if(currentMeshName === undefined){ //Just checking to see if the OBJ creator was smart enough to create an object first
-				createObject('unnamedObject');
+				createMeshObject('unnamedObject');
 			}
 			//Blender's default OBJ export orientation is Y up, -Z forward at the moment, so I'm pushing
 			//the vertex axies in the order of [0,2,1] because I want to compensate for that odd default.
