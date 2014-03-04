@@ -37,9 +37,7 @@ There are only a few steps involved in the setup of an NPos3d powered toy.
 	and give it a `z-index` greater than 1, or the Scene's default canvas will overlap it.
 	-->
 
-	<script src="https://raw.github.com/AdmiralPotato/npos3d/master/src/core.js"></script>
-
-	<!-- Other NPos3d module script tags would go here -->
+	<script src="http://admiralpotato.github.io/js/npos3d/build/npos3d.js"></script>
 
 	<script>
 		//Your scene setup code would go here, or this script tag could be given
@@ -62,20 +60,35 @@ There are only a few steps involved in the setup of an NPos3d powered toy.
 </html>
 ```
 
-Currently, there is no complete build of all of the optional modules for the engine, so you will need to pull in each of the non-core features through their own script tag right after the `core.js` script tag. Documentation on each of these modules can be located lower on this page. Here is a list of all of the currently available modules accessable in the `src` folder:
+The current build of NPos3D includes all of the stables modules. Documentation on each of these modules can be located lower on this page. You can load the engine for use in your pages from the following URL:
 
 ```html
-<script src="https://raw.github.com/AdmiralPotato/npos3d/master/src/font.js"></script>
-<script src="https://raw.github.com/AdmiralPotato/npos3d/master/src/fx.explosion.js"></script>
-<script src="https://raw.github.com/AdmiralPotato/npos3d/master/src/fx.tween.js"></script>
-<script src="https://raw.github.com/AdmiralPotato/npos3d/master/src/geom.circle.js"></script>
-<script src="https://raw.github.com/AdmiralPotato/npos3d/master/src/geom.lathe.js"></script>
-<script src="https://raw.github.com/AdmiralPotato/npos3d/master/src/geom.sphere.js"></script>
-<script src="https://raw.github.com/AdmiralPotato/npos3d/master/src/geom.twist.js"></script>
-<script src="https://raw.github.com/AdmiralPotato/npos3d/master/src/layout.js"></script>
-<script src="https://raw.github.com/AdmiralPotato/npos3d/master/src/sprite.js"></script>
-<script src="https://raw.github.com/AdmiralPotato/npos3d/master/src/utils.color.js"></script>
+<script src="http://admiralpotato.github.io/js/npos3d/build/npos3d.js"></script>
 ```
+
+Or if you prefer, the minified version:
+
+```html
+<script src="http://admiralpotato.github.io/js/npos3d/build/npos3d.min.js"></script>
+```
+
+If you would like to load only the bare minimum of the engine's components, you must first load the `core.js` file, then add each of the non-core features one at a time using their own script tag right after the `core.js` script tag. Here is a list of all of the currently available modules in the `src` folder, in the order that they are merged into the build version above:
+
+```html
+<script src="http://admiralpotato.github.io/js/npos3d/src/core.js"></script>
+
+<script src="http://admiralpotato.github.io/js/npos3d/src/font.js"></script>
+<script src="http://admiralpotato.github.io/js/npos3d/src/layout.js"></script>
+<script src="http://admiralpotato.github.io/js/npos3d/src/sprite.js"></script>
+<script src="http://admiralpotato.github.io/js/npos3d/src/utils.color.js"></script>
+<script src="http://admiralpotato.github.io/js/npos3d/src/fx.tween.js"></script>
+<script src="http://admiralpotato.github.io/js/npos3d/src/fx.explosion.js"></script>
+<script src="http://admiralpotato.github.io/js/npos3d/src/geom.circle.js"></script>
+<script src="http://admiralpotato.github.io/js/npos3d/src/geom.lathe.js"></script>
+<script src="http://admiralpotato.github.io/js/npos3d/src/geom.sphere.js"></script>
+<script src="http://admiralpotato.github.io/js/npos3d/src/geom.twist.js"></script>
+```
+
 ----
 
 #### Scene setup
@@ -89,7 +102,7 @@ var scene = new n.Scene();
 
 When you create a new Scene, a new `<canvas>` element is created and added to the page, and its `height` and `width` attributes are automatically sized to display as fullscreen by default. As the page resizes, this `<canvas>` will continue to resize to fit the full size of the window. The Scene's render loop is also automatically started when the Scene is created, so objects that are added to the Scene will start rendering immediately.
 
-The NPos3d Scene uses the center of the canvas as the center of its coordinate system, meaning that an object with a position of `[0, 0, 0]` is rendered in center of the canvas. The Scene respects "screen space" for it's coordinate system, and the unit of measurement is pixels. This means that positive X values mean right of center, __positive Y values are down from center__, and a positive Z value will move an object closer to the camera. Assuming that the Scene's default camera has not been moved, an object that has position of `[100, 200, 0]` will be displayed at 100 pixels to the right of center, and 200 pixels down from the center of the canvas.
+The NPos3d Scene uses the center of the canvas as the center of its coordinate system, meaning that an object with a position of `[0, 0, 0]` is rendered in the center of the canvas. The Scene respects "screen space" for its coordinate system, and the unit of measurement is pixels. This means that positive X values mean right of center, __positive Y values are down from center__, and a positive Z value will move an object closer to the camera. Assuming that the Scene's default camera has not been moved, an object that has position of `[100, 200, 0]` will be displayed at 100 pixels to the right of center, and 200 pixels down from the center of the canvas.
 
 When you create a new Scene object, a few variables and functions will become global, which can and should be used everywhere inside of your script for convenience.
 
@@ -114,10 +127,10 @@ scene.add(defaultOb);
 ```
 
 ##### With a configuration object
-All renderable objects have a common set of properties that you may assign through arguments to their constructor when you create them. For the `pos`, `rot` and `scale` properties, the values represent the 3D axies in this order: `[x, y, z]`. The complete list of common properties are:
+All renderable objects have a common set of properties that you may assign through arguments to their constructor when you create them. For the `pos`, `rot` and `scale` properties, the values represent the 3D axes in this order: `[x, y, z]`. The complete list of common properties are:
 * `pos` - 3 key array specifying relative position in pixels, adjusting for depth. Default: `[0, 0, 0]`
 * `rot` - 3 key array specifying relative rotation __in radians__. Default: `[0, 0, 0]`
-* `rotOrder` - 3 key array specifying the order in which an object will be rotated along its axies. Only combinations of values such as `[0, 2, 1]`, `[2, 1, 0]` are valid. Default: `[0, 1, 2]`
+* `rotOrder` - 3 key array specifying the order in which an object will be rotated along its axes. An object's rotation order may specify each axis only once, in any order.(0=X, 1=Y, 2=Z) Default: `[0, 1, 2]`
 * `scale` - 3 key array specifying relative scale of the object's children objects and any local geometry. Default: `[1, 1, 1]`
 * `color` - String representing any valid CSS color. Accepts: hsl, hsla, rgb, rgba, 6 digit hex, 3 digit hex. Default: undefined, but will use the value `#fff` from the parent Scene if not otherwise configured
 * `shape` - More on this in the '[Custom Geometry](#custom-geometry)' section
@@ -155,7 +168,6 @@ Geometry objects may optionally have a `lines` property as well, which must be a
 Below, you will find the definition of one shape that will render as a triangle composed of three vertices, and another shape that will render as a rudimentary wireframe space ship. __Please note that if you intend for your shapes to rotate "naturally" when you change their Z rotation value, you should design them so that they are facing to the right, as all of JavaScript's trigonometry functions treat zero degrees as pointing to the right as well.__
 
 ```javascript
-
 var triangleShape = {
 	points: [
 		[ 10, 0,  0, '#fff'],
@@ -214,7 +226,7 @@ scene.add(myShip);
 ----
 
 #### Adding some animation and interactivity
-Now that we have some static, non-moving objects in our scene, let's add some animation and interactivity. All animatable properties on an object are public and can be changed either by it's local `update` method, or by external forces.
+Now that we have some static, non-moving objects in our scene, let's add some animation and interactivity. All animatable properties on an object are public and can be changed either by its local `update` method, or by external forces.
 
 ##### Animating a renderable object via its own update method
 I'll use the existing `myTriangle` object defined in the '[Custom Geometry](#custom-geometry)' section to illustrate this concept. To follow the convention I've been using throughout the NPos3d engine thus far, I define the local variable `t` to represent the renderable object itself for use inside of each of its member functions. __It is important to remember to invoke the local object's `render` method at the end of the definition of its `update` method, or neither it nor any of its children will display at all!__
@@ -224,7 +236,7 @@ myTriangle.update = function() { //update methods are invoked with zero argument
 	var t = this;
 	t.rot[1] += 2 * deg;
 	t.render(); //Remember, this is important, or nothing is displayed.
-}
+};
 ```
 
 ##### Animating one renderable object from another object's update method
