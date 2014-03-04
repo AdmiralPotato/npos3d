@@ -4,11 +4,15 @@ NPos3d.Layout.ResponsivePoint = function(args) {
 	var t = this, type = 'ResponsivePoint';
 	if(t.type !== type){throw type + ' must be invoked using the `new` keyword.';}
 	args = args || {};
-	if(typeof args.offset !== 'undefined' && typeof args.offset.length !== 'number'){
+	if(typeof args.offset !== 'undefined' && typeof args.offset.length !== 'number'){ //does it smell like an array?
 		throw type + ' constructor MUST be provided an `offset` array argument';
 	}
-	if(typeof args.scene !== 'undefined' && typeof args.offset.length !== 'number'){
-		throw type + ' constructor MUST be provided a `scene` object argument';
+	if(
+		typeof args.scene === 'undefined' ||
+		typeof args.scene.type === 'undefined' ||
+		args.scene.type !== 'Scene'
+	){
+		throw type + ' constructor MUST be provided a `Scene` object argument';
 	}
 	t.offset = args.offset;
 	t.scene = args.scene;
@@ -22,16 +26,16 @@ NPos3d.Layout.ResponsivePoint.prototype.type = 'ResponsivePoint';
 NPos3d.Layout.ResponsivePoint.prototype.update = function() {
 	var t = this, i;
 	if(t.offset[0] < 0) {
-		t[0] = t.scene.cx - t.offset[0];
+		t[0] = t.scene.cx + t.offset[0];
 	} else if(t.offset[0] > 0) {
-		t[0] = -t.scene.cx + t.offset[0];
+		t[0] = t.offset[0] - t.scene.cx;
 	} else {
 		t[0] = 0;
 	}
 	if(t.offset[1] < 0) {
-		t[1] = t.scene.cy - t.offset[1];
-	} else if(t.offset[0] > 0) {
-		t[1] = -t.scene.cy + t.offset[1];
+		t[1] = t.scene.cy + t.offset[1];
+	} else if(t.offset[1] > 0) {
+		t[1] = t.offset[1] - t.scene.cy;
 	} else {
 		t[1] = 0;
 	}

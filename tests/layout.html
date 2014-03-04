@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Layout</title>
+	<style>
+		*{
+			margin: 0;
+			padding: 0;
+			border: 0;
+			outline: 0;
+			font-family: inherit;
+			font-size: inherit;
+			line-height: inherit;
+			color: inherit;
+		}
+		html, body{
+			height: 100%;
+		}
+		body{
+			font-family: monospace;
+			font-size: 14px;
+			line-height: 20px;
+			color: #fff;
+		}
+		#output{
+			position: absolute;
+			z-index: 1;
+			top: 0;
+			bottom: 0;
+			left: 0;
+			right: 0;
+			margin: auto;
+			height: 240px;
+			width: 320px;
+		}
+	</style>
+</head>
+<body>
+<pre id="output">
+Resize the window and watch the objects.
+<span id="log"></span>
+</pre>
+<script src="../src/core.js"></script>
+<script src="../src/font.js"></script>
+<script src="../src/layout.js"></script>
+<script>
+
+var n = NPos3d,
+	s = new n.Scene({
+		lineWidth: 1,
+		globalCompositeOperation: 'lighter'
+	}),
+	responsivePointList = [
+		new n.VText({string: ' X', pos: new n.Layout.ResponsivePoint({scene: s, offset: [  0,   0, 0]}) }),
+		new n.VText({string: ' N', pos: new n.Layout.ResponsivePoint({scene: s, offset: [  0,  64, 0]}) }),
+		new n.VText({string: 'NE', pos: new n.Layout.ResponsivePoint({scene: s, offset: [-64,  64, 0]}) }),
+		new n.VText({string: ' E', pos: new n.Layout.ResponsivePoint({scene: s, offset: [-64,   0, 0]}) }),
+		new n.VText({string: 'SE', pos: new n.Layout.ResponsivePoint({scene: s, offset: [-64, -64, 0]}) }),
+		new n.VText({string: ' S', pos: new n.Layout.ResponsivePoint({scene: s, offset: [  0, -64, 0]}) }),
+		new n.VText({string: 'SW', pos: new n.Layout.ResponsivePoint({scene: s, offset: [ 64, -64, 0]}) }),
+		new n.VText({string: ' W', pos: new n.Layout.ResponsivePoint({scene: s, offset: [ 64,   0, 0]}) }),
+		new n.VText({string: 'NW', pos: new n.Layout.ResponsivePoint({scene: s, offset: [ 64,  64, 0]}) })
+	],
+	i, myOb, rp,
+	logElement = document.getElementById('log'),
+	myControl = {
+		rot: [0,0,0],
+		update: function() {
+			var t = this,
+				logText = '';
+			t.rot[1] = s.mpos.x / 50;
+			t.rot[0] = -s.mpos.y / 50;
+			for(i = 0; i < responsivePointList.length; i++){
+				rp = responsivePointList[i];
+				logText += '\n' + rp.string + ': ' + rp.pos.join(', ');
+			}
+			logElement.innerText = logText;
+		}
+	};
+
+s.add(myControl);
+
+for(i = 0; i < responsivePointList.length; i++){
+	rp = responsivePointList[i];
+	s.add(rp);
+}
+
+</script>
+</body>
+</html>
