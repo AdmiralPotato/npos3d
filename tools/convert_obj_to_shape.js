@@ -151,7 +151,7 @@ var objToShapeParser = function(objString, options) {
 				]);
 			}
 		}
-		if(instructionName === 'f'){ //Create Face
+		if(instructionName === 'f' || instructionName === 'l'){ //Create Face or Line
 			//See note WTF1 above to understand the pointNumOffset variable
 			for(pointIndex = 1; pointIndex < instructionArgs.length; pointIndex += 1){
 				line = [
