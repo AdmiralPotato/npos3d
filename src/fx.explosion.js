@@ -22,12 +22,12 @@ NPos3d.Fx.Explosion.prototype = {
 	update: function() {
 		var t = this;
 		t.lines = t.o.shape.lines;
-		t.points = t.o.transformedPointCache;
+		t.points = t.o.getTransformedPoints();
 		//console.log(t);
 		t.lines.forEach(function(line){
 			var p1 = t.points[line[0]],
 				p2 = t.points[line[1]],
-				color = t.o.color || t.o.shape.color || line[2] || t.o.scene.strokeStyle;
+				color = line[2] || t.o.shape.color || t.o.color || t.scene.strokeStyle;
 			t.scene.add(new NPos3d.Fx.ExplosionLine({
 				p1:p1,
 				p2:p2,
@@ -106,7 +106,6 @@ NPos3d.Fx.ExplosionLine.prototype = {
 		t.addVel(t.pos,t.vel);
 		t.addVel(t.rot,t.rotVel);
 		t.color = ['rgba(',ca[0],',',ca[1],',',ca[2],',',(ca[3] * (t.life / t.lifespan)),')'].join('');
-		t.render();
 		t.life -= 1;
 		if(t.life < 1){
 			t.destroy();

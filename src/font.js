@@ -118,7 +118,7 @@ NPos3d.VText = function(args){
 	t.stringCached = false;
 	t.font = args.font || NPos3d.Geom.font;
 	t.cacheTextGeom();
-}
+};
 NPos3d.VText.prototype = {
 	type: 'VText',
 	getStateString:function(){
@@ -209,7 +209,6 @@ NPos3d.VText.prototype = {
 			t.cacheTextGeom();
 		}
 		t.shape.color = t.color;
-		t.render();
 	},
 	destroy:NPos3d.destroyFunc
 };

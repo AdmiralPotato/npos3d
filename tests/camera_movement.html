@@ -1,0 +1,99 @@
+<!doctype html>
+<html>
+<head>
+	<meta charset="utf-8" />
+	<title>NPos3D Camera Movement test</title>
+</head>
+<body>
+<script src="../src/core.js"></script>
+<script src="../src/font.js"></script>
+<script>
+	//The changes demo'd here represent a lot of work to implement some real Camera FOV Math
+	//and all of the associated Matrix processing changes that needed to happen for that.
+	var n = NPos3d,
+		scene = new n.Scene(),
+		cube = new n.Ob3D({
+			pos:[0, 0, 100]
+		}),
+		fontSize = 16,
+		textTopLeft = new n.VText({
+			string: 'Top Left',
+			pos:[-100, -100, 0],
+			fontSize: fontSize
+		}),
+		textTopRight = new n.VText({
+			string: 'Top Right',
+			pos:[100, -100, 0],
+			fontSize: fontSize
+		}),
+		textBottomLeft = new n.VText({
+			string: 'Bottom Left',
+			pos:[-100, 100, 0],
+			fontSize: fontSize
+		}),
+		textBottomRight = new n.VText({
+			string: 'Bottom Right',
+			pos:[100, 100, 0],
+			fontSize: fontSize
+		}),
+		controlObject = {
+			phaze: 0,
+			update: function(){
+				var t = this;
+				t.phaze += 2;
+				//scene.camera.pos[1] = sin(t.phaze * deg) * 200;
+				//console.log(scene.camera.pos);
+				scene.camera.rot[2] += deg * 0.25;
+				//console.log(scene.camera.rot);
+			}
+		};
+
+	var createLandscapeShape = function(){
+		var pointList = [],
+			lineList = [],
+			limit = 20,
+			halfLimit = (limit / 2) - 0.5,
+			spacing = 20,
+			x, y;
+		for(x = 0; x < limit; x++){
+			for(y = 0; y < limit; y++){
+				vertIndex = pointList.length;
+				pointList.push([
+					(x - halfLimit) * spacing,
+					(y - halfLimit) * spacing,
+					Math.sin((x + (y / 2)) * 0.25 * pi) * spacing * 0.5
+				]);
+				if(y > 0){
+					lineList.push([vertIndex -1, vertIndex]);
+				}
+				if(x > 0){
+					lineList.push([vertIndex - limit, vertIndex]);
+				}
+			}
+		}
+		return {
+			points: pointList,
+			lines: lineList
+		}
+	};
+	var landscape = new n.Ob3D({
+		shape: createLandscapeShape(),
+		color: 'rgba(127, 255, 0, 0.9)',
+		renderStyle: 'both',
+		renderAlways: true
+	});
+
+	scene.camera.update = function(){};
+	scene.camera.rotOrder = [2,1,0];
+	scene.camera.pos[2] = 100;
+	scene.camera.rot[0] = -45 * deg;
+	scene.add(landscape);
+	scene.add(cube);
+	scene.add(textTopLeft);
+	scene.add(textTopRight);
+	scene.add(textBottomLeft);
+	scene.add(textBottomRight);
+	scene.add(controlObject);
+</script>
+</body>
+</html>

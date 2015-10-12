@@ -43,6 +43,8 @@ var lOffset = {
 	//this.pos[1] = s.mpos.y;
 	}
 };
+s.camera.pos[2] = 800;
+s.camera.update = function(){};
 s.add(lOffset);
 
 var myCube = new n.Ob3D({
@@ -145,7 +147,7 @@ var imageAdvance = function(e){
 		imageState = 0;
 	}
 	getImageAsMesh(imageList[imageState]);
-}
+};
 document.addEventListener('click',imageAdvance,false);
 
 </script>

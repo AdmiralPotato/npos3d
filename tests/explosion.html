@@ -25,7 +25,6 @@ var makeSelfDestructingCube = function(){
 		var t = this;
 		t.rot[1] += (tau/100);
 		t.rot[2] += (tau/100);
-		t.render();
 		t.life -= 1;
 		if(t.life < 1){
 			new n.Fx.Explosion({
@@ -35,7 +34,7 @@ var makeSelfDestructingCube = function(){
 		}
 	};
 	s.add(myQube);
-}
+};
 
 makeSelfDestructingCube();
 

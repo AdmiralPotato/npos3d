@@ -40,6 +40,8 @@ var lOffset = {
 	//this.pos[1] = s.mpos.y;
 	}
 };
+s.camera.pos[2] = 800;
+s.camera.update = function(){};
 s.add(lOffset);
 
 var myCube = new n.Ob3D({renderAlways:true,pos:lOffset.pos, rot:lOffset.rot, scale:[15,15,15]});

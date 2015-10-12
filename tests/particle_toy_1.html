@@ -32,10 +32,9 @@ CurlyParticle.prototype = {
 	shape:{points:[[0,0,0],[0,10,0],[10,0,0],[0,0,10]],lines:[[0,1],[0,2],[0,3]]},
 	update:function(){
 		var t = this;
-		t.lastPos = t.gPos.slice();
+		t.lastPos = t.getWorldPosition();
 		t.vel = n.Maths.p3Rotate(t.vel,t.curl,t.rotOrder);
 		t.pos = n.Maths.p3Add(t.pos,t.vel);
-		this.render();
 		n.Maths.pointAt(t, t.lastPos);
 		t.life -= 1;
 		t.color = 'rgba(255,0,0,' + (t.life / t.lifeTime) + ')';

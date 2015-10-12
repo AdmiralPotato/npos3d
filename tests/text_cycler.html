@@ -49,7 +49,7 @@ var myControl = {
 		//console.log(s.mpos);
 		//myText.rot = [s.mpos.y /100,-s.mpos.x /100,0];
 		//s.camera.pos = [-s.mpos.x,-s.mpos.y,0];
-		s.camera.pos[2] = zoom;
+		s.camera.pos[2] = zoom + 800;
 		t.i+=1;
 		t.color += 5;
 		myText.color = 'hsl(' + t.color + ',100%,50%)';
@@ -64,7 +64,8 @@ var myControl = {
 			t.color = 0;
 		}
 	}
-}
+};
+s.camera.update = function(){};
 s.add(myControl);
 
 </script>

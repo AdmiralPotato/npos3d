@@ -29,7 +29,6 @@ var ob = {
 		t.scale[0] = t.scale[1] = t.scale[2] = (sin(t.rot[1]) * 1) + 2;
 		t.pointScale = (-sin(t.rot[1]) * 5) + 10;
 		t.color = 'hsl(' + (t.rot[1] / deg)+ ', 100%, 50%)';
-		t.render();
 	}
 };
 n.blessWith3DBase(ob, {});

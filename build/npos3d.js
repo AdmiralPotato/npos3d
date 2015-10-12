@@ -35,22 +35,82 @@ var NPos3d = NPos3d || {
 		if (o.onRemove !== undefined) {
 			o.onRemove();
 		}
-		o.parent = false;
 		o.expired = true;
-		return false;
 	},
 	destroyFunc: function () {
-		var t = this;
-		if (t.parent) {
-			return t.parent.remove(t);
+		if (this.onRemove !== undefined) {
+			this.onRemove();
 		}
-		return false;
+		this.expired = true;
+	},
+	updateMatricesFunc: function(viewMatrix) {
+		var t = this,
+			m = NPos3d.Maths,
+			p = t.parent;
+		//localScale: ,
+		//localRotation: ,
+		//localComposite: ,
+		//globalComposite
+
+		//START updating the object's local matrices
+
+		//scale
+		m.mat4P3Scale(m.__mat4Identity, t.scale, t.matrices.localScale);
+
+		//rotate
+		m.eulerToMat4(t.rot, t.rotOrder, t.matrices.localRotation);
+
+		//composite matrix starts out as scale, no need to multiply
+		m.mat4Set(t.matrices.localComposite, t.matrices.localScale);
+		m.mat4Mul(t.matrices.localComposite, t.matrices.localRotation, t.matrices.localComposite);
+		//no need to multiply the local composite, adding 3 keys will be faster
+		//this is also why we don't need a local localPosition matrix.
+		m.mat4P3Translate(t.matrices.localComposite, t.pos, t.matrices.localComposite);
+
+		//END updating the object's local matrices
+
+		//Multiply the localComposite by the patent's globalComposite to get this object's globalComposite
+		if(p && !p.isScene){
+			m.mat4Mul(t.matrices.localComposite, p.matrices.globalComposite, t.matrices.globalComposite);
+		} else if(viewMatrix != undefined) {
+			m.mat4Mul(t.matrices.localComposite, p.viewMatrix, t.matrices.globalComposite);
+		} else {
+			m.mat4Set(t.matrices.globalComposite, t.matrices.localComposite);
+		}
+
+		m.p3Mat4Mul([0,0,0], t.matrices.globalComposite, t.gPos); //because it rocks to be able to read a global position
+		m.p3Mat4Mul(t.scale, t.matrices.globalComposite, t.gScale); //Would this even work?
+	},
+	recursivelyUpdateMatrices: function rUM(o) {
+		if(o.parent && !o.parent.isScene) {
+			rUM(o.parent);
+		}
+		o.updateMatrices();
+	},
+	transformPoints: function(o, outPoints) {
+		var m = NPos3d.Maths, i;
+		for (i = 0; i < o.shape.points.length; i += 1) {
+			outPoints[i] = m.p3Mat4Mul(o.shape.points[i], o.matrices.globalComposite, outPoints[i]);
+		}
+	},
+	getTransformedPointsFunc: function(){
+		var t = this;
+		var transformedPoints = [];
+		if(t.shape && t.shape.points && t.shape.points.length){
+			NPos3d.recursivelyUpdateMatrices(t);
+			NPos3d.transformPoints(t, transformedPoints);
+		}
+		return transformedPoints;
+	},
+	getWorldPositionFunc: function(){
+		NPos3d.recursivelyUpdateMatrices(this);
+		return NPos3d.Maths.p3Mat4Mul([0,0,0], this.matrices.globalComposite);
 	},
 	renderFunc: function(){
 		//This function should be assigned to objects in the scene which will be rendered;
 		//Example: myObject.render = NPos3d.renderFunc;
 		var t = this; //should be referring to the object being rendered
-		t.scene.updateMatrices(t);
+		t.updateMatrices(t, t.scene.viewMatrix);
 		if(!t.shape || !t.shape.points || !t.shape.points.length){
 			t.transformedPointCache.length = 0;
 		} else {
@@ -75,6 +135,9 @@ var NPos3d = NPos3d || {
 					throw 'Invalid renderStyle specified: ' + t.renderStyle;
 				}
 			}
+		}
+		if(t.postRender){
+			t.postRender();
 		}
 	}
 };
@@ -477,7 +540,6 @@ NPos3d.Scene = function (args) {
 
 	t.debugViewport = args.debugViewport || false;
 	t.mpos = {x: 0,y: 0};
-	t.camera = args.camera || new NPos3d.Camera();
 	t.frameRate = args.frameRate || 30;
 	t.lastFrameRate = t.frameRate;
 	t.pixelScale = args.pixelScale || 1;
@@ -549,7 +611,8 @@ NPos3d.Scene = function (args) {
 
 	t.checkWindow();
 	t.resize();
-	t.setInvertedCameraPos();
+
+	t.camera = args.camera || new NPos3d.Camera({scene: t});
 
 	t.canvas.style.backgroundColor = t.canvasStyleColor;
 	t.cursorPosition = args.canvas !== undefined ? 'absolute' : 'relative';
@@ -595,6 +658,7 @@ NPos3d.Scene = function (args) {
 	t.children = [];
 	t.renderInstructionList = [];
 
+	t.add(t.camera);
 	t.start();
 	t.globalize();
 	return this;
@@ -664,46 +728,25 @@ NPos3d.Scene.prototype = {
 			//window.scrollTo(0,0);
 		}
 	},
-	setInvertedCameraPos: function () {
-		//There is a really, really good reason to have this function.
-		//If you add the position of the camera to all objects in the scene,
-		//they display offset in the direction -opposite- of where they would
-		//had you moved a physical camera - so it is better to add negative
-		//camera position each frame. Also, if the rendering methods all use
-		//t.invertedCameraPos as it is defined at the start of each frame,
-		//you won't have rendering issues caused by objects within the scene
-		//changing the position of the camera and some objects rending at the
-		//old position with others rendering in the new position.
-		this.invertedCameraPos = [
-			-this.camera.pos[0],
-			-this.camera.pos[1],
-			-this.camera.pos[2]
-		];
-	},
-	project3Dto2D: function (p3) {
-		//return {x: p3[0],y: p3[1]}; Orthographic!
-		var scale = this.camera.fov/(this.camera.fov + -p3[2]), p2 = {};
-		p2.x = (p3[0] * scale);
-		p2.y = (p3[1] * scale);
-		p2.scale = scale;
-		p2.color = p3[3] || false;
-		return p2;
-	},
 	updateRecursively: function updateRecursively(o){
-		var i, child;
 		if(!o.isScene){
 			o.update();
 		}
-		if(o.children !== undefined && o.children.length !== undefined && o.children.length > 0){
-			for (i = 0; i < o.children.length; i += 1) {
-				child = o.children[i];
-				updateRecursively(child);
-			}
+		if(o.children){
+			o.children.forEach(updateRecursively);
+		}
+	},
+	renderRecursively: function renderRecursively(o){
+		if(!o.isScene && o.render){
+			o.render();
+		}
+		if(o.children){
+			o.children.forEach(renderRecursively);
 		}
 	},
 	removeExpiredChildrenRecursively: function rECR(o){
 		var len, i, child;
-		if(o.children !== undefined && o.children.length !== undefined && o.children.length > 0){
+		if(o.children){
 			len = o.children.length;
 			for (i = len - 1; i >= 0; i -= 1) {
 				child = o.children[i];
@@ -711,6 +754,7 @@ NPos3d.Scene.prototype = {
 				if(child.expired){
 					o.children.splice(i,1);
 					child.expired = false;
+					child.parent = false;
 					child.scene = false;
 				}
 			}
@@ -735,12 +779,16 @@ NPos3d.Scene.prototype = {
 		if(o.childrenToBeAdded !== undefined && o.childrenToBeAdded.length !== undefined && o.childrenToBeAdded.length > 0){
 			for (i = 0; i < o.childrenToBeAdded.length; i += 1) {
 				newChild = o.childrenToBeAdded[i];
-				newChild.expired = false;
-				o.children.push(newChild);
-				newChild.parent = o;
-				newChild.scene = scene;
-				if (newChild.onAdd !== undefined) {
-					newChild.onAdd();
+				if(newChild.expired) {
+					newChild.expired = false;
+				}
+				else {
+					o.children.push(newChild);
+					newChild.parent = o;
+					newChild.scene = scene;
+					if(newChild.onAdd !== undefined){
+						newChild.onAdd();
+					}
 				}
 			}
 			delete o.childrenToBeAdded;
@@ -761,7 +809,6 @@ NPos3d.Scene.prototype = {
 		try{
 			t.checkWindow();
 			if (t.w !== t.lw || t.h !== t.lh) {t.resize();}
-			t.setInvertedCameraPos();
 
 			if (t.debugViewport) {
 				var newSize = u.subset(window,'innerHeight,innerWidth,outerWidth,outerHeight,devicePixelRatio');
@@ -776,8 +823,10 @@ NPos3d.Scene.prototype = {
 			}
 
 			t.renderInstructionList = []; //the render methods on each object are supposed to populate this array
-			t.updateRecursively(t,'SCENE UPDATE!!!');
 			t.addNewChildrenRecursively(t);
+			t.updateRecursively(t);
+			t.viewMatrix = t.inverseMatrix(t.camera);
+			t.renderRecursively(t);
 			t.removeExpiredChildrenRecursively(t);
 
 			if(t.backgroundColor === 'transparent'){
@@ -849,82 +898,59 @@ NPos3d.Scene.prototype = {
 			}
 		}
 	},
-	updateMatrices: function(o) {
-		var m = NPos3d.Maths, p = o.parent;
-		//localScale: ,
-		//localRotation: ,
-		//localComposite: ,
-		//globalComposite
-
-		//START updating the object's local matrices
-
-		//scale
-		m.mat4P3Scale(m.__mat4Identity, o.scale, o.matrices.localScale);
-
-		//rotate
-		m.eulerToMat4(o.rot, o.rotOrder, o.matrices.localRotation);
-
-		//composite matrix starts out as scale, no need to multiply
-		m.mat4Set(o.matrices.localComposite, o.matrices.localScale);
-		m.mat4Mul(o.matrices.localComposite, o.matrices.localRotation, o.matrices.localComposite);
-		//no need to multiply the local composite, adding 3 keys will be faster
-		//this is also why we don't need a local localPosition matrix.
-		m.mat4P3Translate(o.matrices.localComposite, o.pos, o.matrices.localComposite);
-
-		//END updating the object's local matrices
-
-		//Multiply the localComposite by the patent's globalComposite to get this object's globalComposite
-		if(p !== undefined && p !== false && p.isScene !== true){
-			m.mat4Mul(o.matrices.localComposite, p.matrices.globalComposite, o.matrices.globalComposite);
-		} else { //it's probably the root object.
-			m.mat4Set(o.matrices.globalComposite, o.matrices.localComposite);
-		}
-
-		m.p3Mat4Mul([0,0,0], o.matrices.globalComposite, o.gPos); //because it rocks to be able to read a global position
-		m.p3Mat4Mul(o.scale, o.matrices.globalComposite, o.gScale); //Would this even work?
+	inverseMatrix: function(o) {
+		var m = NPos3d.Maths;
+		var resultMatrix = m.makeMat4();
+		do {
+			var rotationMatrix = m.makeMat4();
+			m.eulerToMat4(
+				o.rot.map(function(n){
+					return -n
+				}),
+				o.rotOrder.slice().reverse(),
+				rotationMatrix
+			);
+			m.mat4P3Translate(resultMatrix, [-o.pos[0], -o.pos[1], -o.pos[2]], resultMatrix);
+			m.mat4Mul(resultMatrix, rotationMatrix, resultMatrix);
+			m.mat4P3Scale(resultMatrix, o.scale.map(function(n){
+				return -n
+			}));
+			o = o.parent;
+		} while(o && !o.isScene);
+		return resultMatrix;
 	},
-	updateTransformedPointCache: function (o) {
-		var t = this, m = NPos3d.Maths, i, point, currentGlobalCompositeMatrixString;
-		t.updateMatrices(o);
+	updateTransformedPointCache: function (o){
+		var t = this, m = NPos3d.Maths, i, currentGlobalCompositeMatrixString;
 		if(o.transformedPointCache.length !== o.shape.points.length){
 			o.transformedPointCache.length = 0; //empty the array, keep the object reference
-			for (i = 0; i < o.shape.points.length; i += 1) {
-				o.transformedPointCache[i] = [0,0,0];
-			}
 			o.lastGlobalCompositeMatrixString = false;
 		}
 		currentGlobalCompositeMatrixString = o.matrices.globalComposite.toString();
 		if (!o.lastGlobalCompositeMatrixString || o.lastGlobalCompositeMatrixString !== currentGlobalCompositeMatrixString) {
-			for (i = 0; i < o.shape.points.length; i += 1) {
-				//to make sure I'm not messing with the original shape array...
-				point = o.transformedPointCache[i];
-				m.p3Mat4Mul(o.shape.points[i], o.matrices.globalComposite, point);
-			}
+			NPos3d.transformPoints(o, o.transformedPointCache);
 			o.boundingBox = m.nGetBounds(o.transformedPointCache);
 			o.lastGlobalCompositeMatrixString = currentGlobalCompositeMatrixString;
 		}
 	},
 	lineRenderLoop: function (o) {
-		var t = this, m = NPos3d.Maths, computedPointList = [], i, point, p3a, p3b, t3a, t3b;
-		for (i = 0; i < o.transformedPointCache.length; i += 1) {
-			//to make sure I'm not messing with the original array...
-			point = o.transformedPointCache[i];
-			computedPointList[i] = point;
-		}
+		var t = this, m = NPos3d.Maths,
+			i, p3a, p3b;
 		for (i = 0; i < o.shape.lines.length; i += 1) {
 			//offset the points by the object's position
-			p3a = m.p3Add(computedPointList[o.shape.lines[i][0]], t.invertedCameraPos);
-			p3b = m.p3Add(computedPointList[o.shape.lines[i][1]], t.invertedCameraPos);
+			p3a = o.transformedPointCache[o.shape.lines[i][0]];
+			p3b = o.transformedPointCache[o.shape.lines[i][1]];
 
 			//if the depths of the first and second point in the line are not behind the camera...
 			//and the depths of the first and second point in the line are closer than the far plane...
-			if (p3a[2] < t.camera.clipNear &&
-			   p3b[2] < t.camera.clipNear &&
-			   p3a[2] > t.camera.clipFar &&
-			   p3b[2] > t.camera.clipFar) {
+			if (
+				p3a[2] < t.camera.clipNear &&
+				p3b[2] < t.camera.clipNear &&
+				p3a[2] > t.camera.clipFar &&
+				p3b[2] > t.camera.clipFar
+			) {
 
-				var p0 = t.project3Dto2D(p3a);
-				var p1 = t.project3Dto2D(p3b);
+				var p0 = t.camera.project3Dto2D(p3a);
+				var p1 = t.camera.project3Dto2D(p3b);
 				//                   min        max
 				var screenBounds = [[-t.cx, -t.cy],[t.cx, t.cy]];
 				var p0InBounds = m.pointIn2dBounds([p0.x,p0.y],screenBounds);
@@ -966,7 +992,7 @@ NPos3d.Scene.prototype = {
 			//to sort the array above to orient the point closest to the center of the screen nearest the first of the list,
 			//so I don't bother checking all 8 points to determine if it's on screen - or even off screen.
 			for (i = 0; i < bbCube.length && bbOffScreen; i += 1) {
-				bbp = t.project3Dto2D(bbCube[i]);
+				bbp = t.camera.project3Dto2D(bbCube[i]);
 				if (bbp.x < t.cx && bbp.x > -t.cx && bbp.y < t.cy && bbp.y > -t.cy) {
 					bbOffScreen = false;
 				}
@@ -988,7 +1014,12 @@ NPos3d.Scene.prototype = {
 		bbMaxOffset = o.boundingBox[1];
 
 		//Checking to see if any part of the bounding box is in front on the camera and closer than the far plane before bothering to do anything else...
-		if (bbMaxOffset[2] > t.camera.clipFar && bbMinOffset[2] < t.camera.clipNear && bbMaxOffset[2] > t.camera.clipFar && bbMaxOffset[2] < t.camera.clipNear) {
+		if (
+			bbMaxOffset[2] > t.camera.clipFar &&
+			bbMinOffset[2] < t.camera.clipNear &&
+			bbMaxOffset[2] > t.camera.clipFar &&
+			bbMaxOffset[2] < t.camera.clipNear
+		) {
 			//Alright. It's in front and not behind. Now is the bounding box even partially on screen?
 			//8 points determine the cube... let's start from the top left, spiraling down clockwise
 			bbCube = m.makeBBCubeFromTwoPoints(bbMinOffset,bbMaxOffset);
@@ -997,7 +1028,7 @@ NPos3d.Scene.prototype = {
 			//to sort the array above to orient the point closest to the center of the screen nearest the first of the list,
 			//so I don't bother checking all 8 points to determine if it's on screen - or even off screen.
 			for (i = 0; i < bbCube.length && bbOffScreen; i += 1) {
-				bbp = t.project3Dto2D(bbCube[i]);
+				bbp = t.camera.project3Dto2D(bbCube[i]);
 				if (bbp.x < t.cx && bbp.x > -t.cx && bbp.y < t.cy && bbp.y > -t.cy) {
 					bbOffScreen = false;
 				}
@@ -1008,19 +1039,15 @@ NPos3d.Scene.prototype = {
 		}
 	},
 	pointRenderLoop: function (o) {
-		var t = this, m = NPos3d.Maths, computedPointList = [], i, point, p3a, p0, screenBounds, circleArgs;
-		for (i = 0; i < o.transformedPointCache.length; i += 1) {
-			//to make sure I'm not messing with the original array...
-			point = o.transformedPointCache[i];
-			computedPointList[i] = point;
-		}
+		var t = this, m = NPos3d.Maths,
+			i, p3a, p0, screenBounds, circleArgs;
 		for (i = 0; i < o.transformedPointCache.length; i += 1) {
 			//offset the points by the object's position
-			p3a = m.p3Add(computedPointList[i], t.invertedCameraPos);
+			p3a = o.transformedPointCache[i];
 			//if the depth of the point is not behind the camera...
 			//and the depth of the point is closer than the far plane...
 			if (p3a[2] < t.camera.clipNear && p3a[2] > t.camera.clipFar) {
-				p0 = t.project3Dto2D(p3a);
+				p0 = t.camera.project3Dto2D(p3a);
 				//                   min        max
 				screenBounds = [[-t.cx, -t.cy],[t.cx, t.cy]];
 				var p0InBounds = m.pointIn2dBounds([p0.x,p0.y],screenBounds);
@@ -1055,17 +1082,35 @@ NPos3d.Scene.prototype = {
 
 NPos3d.Camera = function (args) {
 	var t = this, type = 'Camera';
-	if(t.type !== type){throw 'You must use the `new` keyword when invoking the ' + type + ' constructor.';}
 	args = args || {};
+	if(t.type !== type){throw 'You must use the `new` keyword when invoking the ' + type + ' constructor.';}
+	if(!args.scene){throw 'You must provide a `scene` property when invoking the ' + type + ' constructor.';}
+	NPos3d.blessWith3DBase(t, args);
 	//Field Of View; Important!
-	t.fov = args.fov || 550;
-	t.clipNear = args.clipNear || t.fov; //This line is also VERY important! Never have the clipNear less than the FOV!
-	t.clipFar = args.clipFar || -1000;
-	t.pos = args.pos || [0,0,0];
-	t.rot = args.rot || [0,0,0];//Totally not implemented yet.
+	t.clipNear = args.clipNear || -0.01;
+	t.clipFar = args.clipFar || -9001;
+	t.frustumMultiplier = args.frustumMultiplier || 0.75;
 };
 NPos3d.Camera.prototype = {
-	type: 'Camera'
+	type: 'Camera',
+	update: function(){
+		var t = this;
+		t.pos[2] = Math.max(t.scene.w, t.scene.h) * t.frustumMultiplier;
+		// RECIPROCAL width / height of the frustum at ONE unit away from the camera
+		// this arranges it so that it is exactly the right number of pixels where z=0, given where the camera is now
+	},
+	project3Dto2D: function (p3) {
+		var t = this,
+			canvasDim = Math.max(t.scene.w, t.scene.h),
+			scale = 1 / -p3[2],
+			p2 = {
+				x: (p3[0] * canvasDim * t.frustumMultiplier * scale),
+				y: (p3[1] * canvasDim * t.frustumMultiplier * scale),
+				scale: canvasDim * t.frustumMultiplier * scale,
+				color: p3[3] || false
+			};
+		return p2;
+	}
 };
 
 NPos3d.Geom = {
@@ -1136,13 +1181,16 @@ NPos3d.blessWith3DBase = function (o,args) {
 	o.pointScale = args.pointScale || o.pointScale || 2;
 	o.pointStyle = args.pointStyle || o.pointStyle || 'fill';//stroke
 	o.lineWidth = args.lineWidth || undefined;
-	o.scene = false; //An object should know which scene it's in, if it would like to be destroyed.
+	o.scene = args.scene;
 
 	o.expired = false;
 	o.add = NPos3d.addFunc;
 	o.remove = NPos3d.removeFunc;
 	o.destroy = NPos3d.destroyFunc;
 	o.render = NPos3d.renderFunc;
+	o.getTransformedPoints = NPos3d.getTransformedPointsFunc;
+	o.getWorldPosition = NPos3d.getWorldPositionFunc;
+	o.updateMatrices = NPos3d.updateMatricesFunc;
 };
 
 NPos3d.Ob3D = function (args) {
@@ -1156,9 +1204,7 @@ NPos3d.Ob3D = function (args) {
 NPos3d.Ob3D.prototype = {
 	type: 'Ob3D',
 	shape: NPos3d.Geom.cube,
-	update: function () {
-		this.render();
-	}
+	update: function () {}
 };
 //Because it's just fine to spend 12K worth of data to include a sexy vector font that I designed in about an hour and a half
 NPos3d.Geom.font = {
@@ -1280,7 +1326,7 @@ NPos3d.VText = function(args){
 	t.stringCached = false;
 	t.font = args.font || NPos3d.Geom.font;
 	t.cacheTextGeom();
-}
+};
 NPos3d.VText.prototype = {
 	type: 'VText',
 	getStateString:function(){
@@ -1371,7 +1417,6 @@ NPos3d.VText.prototype = {
 			t.cacheTextGeom();
 		}
 		t.shape.color = t.color;
-		t.render();
 	},
 	destroy:NPos3d.destroyFunc
 };
@@ -1446,12 +1491,12 @@ NPos3d.Scene.prototype.drawSprite = function(c,o){
 };
 NPos3d.Scene.prototype.renderSprite = function(o){
 	var t = this;
-	t.updateMatrices(o);
+	o.updateMatrices();
 	if(o.loaded){
 		//offset the points by the object's position
 		var p3 = o.gPos;
 		if( p3[2] < t.camera.clipNear && p3[2] > t.camera.clipFar ){
-			o.point2D = t.project3Dto2D(p3); //a convenience measure
+			o.point2D = t.camera.project3Dto2D(p3); //a convenience measure
 			//Just some basic positional culling... if it's not on screen, don't render it...
 			if(
 				(o.point2D.x + (o.offset.x * o.point2D.scale) < t.cx && o.point2D.x - (o.offset.x * o.point2D.scale) > -t.cx) &&
@@ -1468,7 +1513,7 @@ NPos3d.Scene.prototype.renderSprite = function(o){
 };
 NPos3d.renderSpriteFunc =  function(){
 	this.scene.renderSprite(this);
-}
+};
 
 NPos3d.blessWithSpriteBase = function(o,config){
 	if(!config.path){throw 'You MUST provide an image `path` value on sprite type objects!'};
@@ -1509,9 +1554,7 @@ NPos3d.Sprite3D = function(config){
 
 NPos3d.Sprite3D.prototype = {
 	type: 'Sprite3D',
-	update:function(){
-		this.render();
-	},
+	update:function(){},
 	destroy:NPos3d.destroyFunc
 };
 NPos3d.Utils = NPos3d.Utils || {};
@@ -1773,12 +1816,12 @@ NPos3d.Fx.Explosion.prototype = {
 	update: function() {
 		var t = this;
 		t.lines = t.o.shape.lines;
-		t.points = t.o.transformedPointCache;
+		t.points = t.o.getTransformedPoints();
 		//console.log(t);
 		t.lines.forEach(function(line){
 			var p1 = t.points[line[0]],
 				p2 = t.points[line[1]],
-				color = t.o.color || t.o.shape.color || line[2] || t.o.scene.strokeStyle;
+				color = line[2] || t.o.shape.color || t.o.color || t.scene.strokeStyle;
 			t.scene.add(new NPos3d.Fx.ExplosionLine({
 				p1:p1,
 				p2:p2,
@@ -1857,7 +1900,6 @@ NPos3d.Fx.ExplosionLine.prototype = {
 		t.addVel(t.pos,t.vel);
 		t.addVel(t.rot,t.rotVel);
 		t.color = ['rgba(',ca[0],',',ca[1],',',ca[2],',',(ca[3] * (t.life / t.lifespan)),')'].join('');
-		t.render();
 		t.life -= 1;
 		if(t.life < 1){
 			t.destroy();

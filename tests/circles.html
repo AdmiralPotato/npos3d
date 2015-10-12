@@ -32,7 +32,9 @@ var userControl = {
 	//this.pos[0] = s.mpos.x;
 	//this.pos[1] = s.mpos.y;
 	}
-}
+};
+s.camera.pos[2] = 800;
+s.camera.update = function(){};
 s.add(userControl);
 
 
@@ -58,16 +60,7 @@ myOb.update = function(){
 		t.shape.formCircle();
 		t.lastGlobalCompositeMatrixString = false;
 	}
-	try{
-		t.render();
-	}
-	catch(error){
-		console.log(error);
-		console.log(t);
-		console.log(t.shape);
-		s.stop();
-	}
-}
+};
 s.add(myOb);
 
 </script>

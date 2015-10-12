@@ -52,7 +52,6 @@ There are only a few steps involved in the setup of an NPos3d powered toy.
 			t.rot[0] -= deg;
 			t.rot[1] += deg;
 			t.color = 'hsl(' + Math.round(t.rot[1] / deg) + ', 100%, 50%)';
-			t.render();
 		};
 		scene.add(myOb);
 	</script>
@@ -229,13 +228,12 @@ scene.add(myShip);
 Now that we have some static, non-moving objects in our scene, let's add some animation and interactivity. All animatable properties on an object are public and can be changed either by its local `update` method, or by external forces.
 
 ##### Animating a renderable object via its own update method
-I'll use the existing `myTriangle` object defined in the '[Custom Geometry](#custom-geometry)' section to illustrate this concept. To follow the convention I've been using throughout the NPos3d engine thus far, I define the local variable `t` to represent the renderable object itself for use inside of each of its member functions. __It is important to remember to invoke the local object's `render` method at the end of the definition of its `update` method, or neither it nor any of its children will display at all!__
+I'll use the existing `myTriangle` object defined in the '[Custom Geometry](#custom-geometry)' section to illustrate this concept. To follow the convention I've been using throughout the NPos3d engine thus far, I define the local variable `t` to represent the renderable object itself for use inside of each of its member functions.
 
 ```javascript
 myTriangle.update = function() { //update methods are invoked with zero arguments
 	var t = this;
 	t.rot[1] += 2 * deg;
-	t.render(); //Remember, this is important, or nothing is displayed.
 };
 ```
 

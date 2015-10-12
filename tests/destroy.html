@@ -12,16 +12,18 @@ var s = new n.Scene();
 var myQube = new n.Ob3D({
 	rot:[tau/8,tau/6,0]
 });
+myQube.countdown = 30;
 myQube.update = function(){
 	var t = this;
 	t.rot[1] += (tau/100);
 	t.rot[2] += (tau/100);
-	t.render();
-}
+	if(t.countdown-- <= 0){
+		t.destroy();
+	}
+};
 s.add(myQube);
 
 //TODO: Repair this! Currently broken because objects cannot be destroyed in the same frame they are added.
-myQube.destroy();
 
 </script>
 </body>

@@ -36,7 +36,6 @@ mySphere.update = function(){
 	t.rot[0] += deg;
 	t.pos[0] = s.mpos.x;
 	t.pos[1] = s.mpos.y;
-	t.render();
 };
 s.add(mySphere);
 
@@ -48,7 +47,6 @@ myCube.update = function(){
 	var t = this;
 	//t.rot[0] += deg;
 	t.rot[2] += deg * 2;
-	t.render();
 };
 mySphere.add(myCube);
 

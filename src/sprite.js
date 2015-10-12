@@ -20,12 +20,12 @@ NPos3d.Scene.prototype.drawSprite = function(c,o){
 };
 NPos3d.Scene.prototype.renderSprite = function(o){
 	var t = this;
-	t.updateMatrices(o);
+	o.updateMatrices();
 	if(o.loaded){
 		//offset the points by the object's position
 		var p3 = o.gPos;
 		if( p3[2] < t.camera.clipNear && p3[2] > t.camera.clipFar ){
-			o.point2D = t.project3Dto2D(p3); //a convenience measure
+			o.point2D = t.camera.project3Dto2D(p3); //a convenience measure
 			//Just some basic positional culling... if it's not on screen, don't render it...
 			if(
 				(o.point2D.x + (o.offset.x * o.point2D.scale) < t.cx && o.point2D.x - (o.offset.x * o.point2D.scale) > -t.cx) &&
@@ -42,7 +42,7 @@ NPos3d.Scene.prototype.renderSprite = function(o){
 };
 NPos3d.renderSpriteFunc =  function(){
 	this.scene.renderSprite(this);
-}
+};
 
 NPos3d.blessWithSpriteBase = function(o,config){
 	if(!config.path){throw 'You MUST provide an image `path` value on sprite type objects!'};
@@ -83,8 +83,6 @@ NPos3d.Sprite3D = function(config){
 
 NPos3d.Sprite3D.prototype = {
 	type: 'Sprite3D',
-	update:function(){
-		this.render();
-	},
+	update:function(){},
 	destroy:NPos3d.destroyFunc
 };

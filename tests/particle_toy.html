@@ -48,7 +48,6 @@ Particle.prototype = {
 		//t.shape.points[0][3] = 'hsla(90,100%,50%,' + opac + ')';
 		t.pointScale = (opac * 3) + 1;
 		t.rot[2] += (tau/30) * t.rotSpeed;
-		t.render();
 		if(t.life < 1){
 			t.destroy();
 			makeParticle();
