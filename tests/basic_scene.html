@@ -1,8 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta name="viewport" content="width=100">
-<title>Basic Scene</title>
+	<title>Basic Scene</title>
 </head>
 <body>
 <script src="../src/core.js"></script>
@@ -12,7 +11,9 @@
 <script>
 
 var n = NPos3d;
-var s = new n.Scene();
+var s = new n.Scene({
+	forceRealPixels: false
+});
 
 var addAxiesToShape = function(shape, scale){
 	scale = scale || 100;

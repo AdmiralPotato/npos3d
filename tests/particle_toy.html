@@ -1,13 +1,16 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Particle Toy</title>
+	<title>Particle Toy</title>
 </head>
 <body>
 <script src="../src/core.js"></script>
 <script>
 var n = NPos3d;
-var s = new n.Scene({frameRate:40});
+var s = new n.Scene({
+	frameRate:40,
+	forceRealPixels: false
+});
 var q = s.rQ;
 var rand = function(num){
 	return (Math.random() * (num * 2)) - num;

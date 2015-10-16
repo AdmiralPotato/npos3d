@@ -548,7 +548,8 @@ NPos3d.Scene = function (args) {
 	t.strokeStyle = args.strokeStyle || '#fff';
 	t.fillStyle = args.fillStyle || '#fff';
 	t.lineWidth = args.lineWidth || undefined;
-	t.fullScreen = args.fullScreen === undefined || args.fullScreen === true ? true : false;
+	t.fullScreen = !!(args.fullScreen === undefined || args.fullScreen === true);
+	t.forceRealPixels = !!(args.forceRealPixels === undefined || args.forceRealPixels === true);
 
 	t.oldAndroid = /android 2/i.test(navigator.userAgent);
 	t.mobileSafari = /iphone|ipad|ipod/i.test(navigator.userAgent);
@@ -577,12 +578,25 @@ NPos3d.Scene = function (args) {
 		if(args.zIndex !== undefined){
 			t.canvas.style.zIndex = args.zIndex;
 		}
-		if (t.useOuterWidth) {
+		if(
+			window.orientation !== undefined &&
+			window.outerWidth === 0
+		) { //it's broken because it's an iOS device
+			t.checkWindow = function () {
+				var scaleMultiplier = t.forceRealPixels ? window.devicePixelRatio : 1,
+					actualWidth = window.screen.width;
+				if(window.orientation !== 0){
+					actualWidth = window.screen.height;
+				}
+				t.w = Math.ceil(scaleMultiplier * actualWidth / t.pixelScale);
+				t.h = Math.ceil(window.innerHeight / t.pixelScale);
+			};
+		} else if (t.useOuterWidth) {
 			t.checkWindow = function () {
 				t.w = Math.ceil(window.outerWidth / t.pixelScale);
 				t.h = Math.ceil(window.outerHeight / t.pixelScale);
 			};
-		} else {
+		}  else {
 			t.checkWindow = function () {
 				t.w = Math.ceil(window.innerWidth / t.pixelScale);
 				t.h = Math.ceil(window.innerHeight / t.pixelScale);
@@ -619,7 +633,6 @@ NPos3d.Scene = function (args) {
 	t.mouseHandler = function (e) {
 		var canvasOffsetX = 0,
 			canvasOffsetY = 0,
-			ratio = window.devicePixelRatio || 1,
 			pointX = 0,
 			pointY = 0;
 		if(e.target === t.canvas || e.target === window){
@@ -631,15 +644,11 @@ NPos3d.Scene = function (args) {
 			canvasOffsetY = offset.top;
 		}
 		if (e.touches && e.touches.length) {
-			pointX = e.touches[0].screenX;
-			pointY = e.touches[0].screenY;
+			pointX = e.touches[0].clientX;
+			pointY = e.touches[0].clientY;
 		} else {
 			pointX = e.clientX;
 			pointY = e.clientY;
-		}
-		if(ratio !== undefined || ratio !== 1){
-			pointX *= ratio;
-			pointY *= ratio;
 		}
 		if(t.cursorPosition === 'absolute'){
 			pointX -= canvasOffsetX;
@@ -653,7 +662,6 @@ NPos3d.Scene = function (args) {
 	window.addEventListener('touchstart',t.mouseHandler,false);
 	window.addEventListener('touchmove',t.mouseHandler,false);
 	//window.addEventListener('touchend',t.mouseHandler,false);
-	//console.log(window.innerHeight, window.outerHeight);
 
 	t.children = [];
 	t.renderInstructionList = [];
@@ -677,7 +685,7 @@ NPos3d.Scene.prototype = {
 		window.square = NPos3d.Maths.square;
 	},
 	resize: function () {
-		var t = this, meta, ratio;
+		var t = this;
 		t.cx = Math.floor(t.w/2);
 		t.cy = Math.floor(t.h/2);
 		t.mpos.x = 0;
@@ -693,40 +701,59 @@ NPos3d.Scene.prototype = {
 		}
 		t.lw = t.w;
 		t.lh = t.h;
-		if(t.isMobile){
-			//Normally, this function would end here,
-			//but both FireFox and "Web" for Android refuse to allow me to display pages pixel-per-pixel in any sane way.
-			//This does 3 things -
-			//	1: Make the canvas very, very large, which kills performance
-			//	2: Make the render output SUCK
-			//	3: HULK SMASH!!!
-			meta = document.getElementById('vp');
-			if (!meta) {
-				meta = document.createElement('meta');
-				meta.setAttribute('name','viewport');
-				meta.setAttribute('id','vp');
-			}
-			if (meta && meta.parentNode === document.head) {
-				document.head.removeChild(meta);
-			}
-			//Mobile FireFox: https://developer.mozilla.org/en-US/docs/Mobile/Viewport_meta_tag
-			//Android Viewport reference: http://developer.android.com/guide/webapps/targeting.html#Metadata
-			//Some Actual User testing: http://stackoverflow.com/questions/11345896/full-webpage-and-disabled-zoom-viewport-meta-tag-for-all-mobile-browsers#answer-12270403
-			if(t.mobileFireFox){
-				meta.setAttribute('content','width=' + t.w + ', user-scalable=no, target-densityDpi=device-dpi');
-			} else if(t.mobileSafari || t.newChromeMobile) {
-				ratio = 1 / (window.devicePixelRatio || 1);
-				meta.setAttribute('content','width=device-width, initial-scale=' + ratio + ', minimum-scale=' + ratio + ', maximum-scale=' + ratio + ', user-scalable=no');
-			} else {
-				meta.setAttribute('content','width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, target-densityDpi=device-dpi');
-			}
-			document.head.appendChild(meta);
-			//used to scroll to remove header on oldAndroid
-			//if(t.fullScreen && t.isMobile && ! t.oldAndroid){
-			//	window.scrollTo(0,1);
-			//}
-			//window.scrollTo(0,0);
+		if(t.isMobile ){
+			t.handleViewportShenanigans();
 		}
+	},
+	handleViewportShenanigans: function(){
+		//Normally, something like this should never exist under any reasonable circumstances,
+		//but mobile browsers refuse to allow me to display pages pixel-per-pixel in any sane way.
+		//This does 3 things -
+		//	1: Make the canvas very, very large, which kills performance
+		//	2: Make the render output SUCK
+		//	3: HULK SMASH!!!
+		var t = this,
+			meta = document.getElementById('vp'),
+			viewportContentString;
+		if (!meta) {
+			meta = document.createElement('meta');
+			meta.setAttribute('name','viewport');
+			meta.setAttribute('id','vp');
+		}
+		if (meta && meta.parentNode === document.head) {
+			document.head.removeChild(meta);
+		}
+		if(t.forceRealPixels){
+			viewportContentString = t.getViewportForceRealPixelsString();
+		} else {
+			viewportContentString = t.getCommonViewportWidth() + t.commonViewportProperties;
+		}
+		meta.setAttribute('content', viewportContentString);
+		document.head.appendChild(meta);
+	},
+	getCommonViewportWidth: function(){
+		var t = this,
+			result = 'width=device-width';
+		if(t.mobileSafari){
+			result = 'width=' + t.w;
+		}
+		return result;
+	},
+	commonViewportProperties: ', initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no',
+	getViewportForceRealPixelsString: function(){
+		var t = this,
+			result = '',
+			ratio, repairedRatioString;
+		if(t.mobileFireFox){
+			result = 'width=' + t.w + ', user-scalable=no, target-densityDpi=device-dpi';
+		} else if(t.mobileSafari || t.newChromeMobile) {
+			ratio = 1 / (window.devicePixelRatio || 1);
+			repairedRatioString = ', initial-scale=' + ratio + ', minimum-scale=' + ratio + ', maximum-scale=' + ratio + ', user-scalable=no';
+			result = t.getCommonViewportWidth() + repairedRatioString;
+		} else {
+			result = 'width=device-width, target-densityDpi=device-dpi' + t.commonViewportProperties;
+		}
+		return result;
 	},
 	updateRecursively: function updateRecursively(o){
 		if(!o.isScene){
